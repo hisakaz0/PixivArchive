@@ -23,7 +23,7 @@ function CookieLogin ( $cookie_file, $html_file ){ // cookie_fileでログイン
   fclose($handle);
 
   if ( $info['url'] == 'http://www.pixiv.net/'){ // 成功
-    fputs(STDERR, "Your login is successful!.\n");
+    fputs(STDERR, "Your login is successful!\n");
     return 0;
   }else{ // 失敗
     fputs(STDERR, "Faile: your login...\n");

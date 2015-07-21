@@ -8,7 +8,8 @@ function login($pixiv_id, $password, $cookie_file){
     'mode' => 'login',
     'pixiv_id' => $pixiv_id,
     'pass' => $password,
-    'submit' => 'ログイン'
+    'submit' => 'ログイン',
+    'skip' => '1'
   );
 
   $dump_file = 'log/login.log';

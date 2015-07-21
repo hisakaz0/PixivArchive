@@ -2,24 +2,43 @@
 
 function PixivArtWorkDownload ( $userlist, $cookie_file ){
 
-  foreach ( $userlist as $user ){
+  $store_userlist = array();
 
-    list( $user_id, $last_artwork_id, $display_name ) = $user;
+  foreach ( $userlist as $user ){ // 一つ一つ取り出し
 
-    if ( ! UserCheck( $user_id, $cookie_file ) ){ // user exsit
-      if ( $last_artwork_id == '' ){ // last_artwork_idがnull
+    // ユーザ情報を user_id, last_artwork_id, display_nameに分解
+    $user_id = $user['user_id'];
+    $last_artwork_id = $user['last_artwork_id'];
+    $display_name = $user_id; // 表示名にuser_idを使う
+
+    if ( UserCheck( $user_id, $cookie_file ) == 0 ){ // user exsit
+
+      if ( $display_name == '' ){ // display_nameが空だったら
+        $display_name = $user_id; // 表示名にuser_idを使う
+      }
+
+      if ( $last_artwork_id == '' ){ // last_artwork_idがnull 初めてのご利用
+        $dir = 'images/' . $display_name; // ユーザのディレクトリ
+        if ( ! file_exists( $dir ) ){ // フォルダが作られているか
+          mkdir( $dir, 0777, true ) // なかったら作る
+            or die("Interrupt: Can't mkdir " . $dir ."'\n"); // 事故があったらえんだー
+        }
         $page = 1; // 最新のページ
         $current_artwork_id = GetFirstArtWorkId( $user_id, $page, $cookie_file ); //処女get
-        DownloadArtWork(  $current_artwork_id ); // 先頭はdlする
+        DownloadArtWork( // 先頭の作品をdl
+          $current_artwork_id, $display_name, $cookie_file );
       } else {
         $current_artwork_id = $last_artwork_id; // 注目している作品
       }
-      AllDownloadArtWork( $current_artwork_id ); // 最新の作品までdonwnload
-    } else { // Not exsit this user
-      fputs(STDERR, "Interrupt: user_id '$user_id' is not exsit!\n");
+
+      $last_artwork_id = AllDownloadArtWork(
+        $current_artwork_id, $display_name, $cookie_file ); // 最新の作品までdonwnload
+      $user = array( $user_id, $last_artwork_id ); // last_artwork_idを更新する.
+      array_push( $store_userlist, $user );
     }
   }
 
+  return $store_userlist;
 }
 
 function UserCheck( $user_id, $cookie_file ){
@@ -46,36 +65,95 @@ function UserCheck( $user_id, $cookie_file ){
   fputs( $handle, $res );
   fclose($handle);
 
-  if ( $info['http_code'] != '404' ){ // ユーザが存在する
+  if ( $info['http_code'] != '404' ){ // ユーザが存在するかどうか
+    fputs( STDERR, "Start: Download artworks of user_id '$user_id'.\n"); //いた
     return 0;
   } else { // ユーザが存在しない
+    fputs( STDERR, "Error: user_id '$user_id' is not exsit!\n"); // そんなユーザいねぇ
     return 1;
   }
 }
 
-function AllDownloadArtWork( $user_id, $current_artwork_id ){
-  $next_artwork_id = NextArtwork( $user_id, $current_artwork_id );
+function AllDownloadArtWork( $current_artwork_id, $display_name, $cookie_file ){
 
-  if ( $next_artwork_id != '' ){ // 次の作品があるとき
-    DownloadArtWork( $user_id, $next_artwork_id );
-    AllDownloadArtWork( $user_id, $next_artwork_id );
-  } else { // 次の作品が無いとき
-    return 0;
+  while( true ){
+    //  次の作品のidを拾ってくる ない場合は今見ている作品のid
+    $next_artwork_id = NextArtworkExist( $current_artwork_id, $cookie_file );
+    if ( $next_artwork_id != $current_artwork_id ){ // 次の作品があるとき
+      DownloadArtWork( $next_artwork_id, $display_name, $cookie_file );
+      $current_artwork_id = $next_artwork_id; // 注目点を次に移す
+    } else { // 次の作品が無いとき
+      return $current_artwork_id; // 現在のartwork_idを返却
+    }
   }
 }
 
 function GetFirstArtWorkId( $user_id, $page, $cookie_file ){
 
-  $url = 'http://www.pixiv.net/member_illust.php?'
-    . 'id=' . $user_id . '&type=all' . '&p=' . $page;
 
-  $dump_file = 'log/first_artwork_id' . $user_id . '.log';
-  $html_file = 'log/first_artwork_id' . $user_id . '.html';
+  while ( true ){
+
+    $url = 'http://www.pixiv.net/member_illust.php?' // urlの設定
+      . 'id=' . $user_id . '&type=all' . '&p=' . $page;
+
+    $dump_file = 'log/first_artwork_id' . $user_id . '.log';
+    $html_file = 'log/first_artwork_id' . $user_id . '.html';
+
+    $ch = curl_init($url); // curlの初期設定
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
+    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を保存する
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
+    $html = curl_exec($ch);
+    $info = curl_getinfo($ch); // 実行結果
+    curl_close($ch); // curl終了
+    $res = print_r($info, true);
+
+    $handle = fopen($html_file, 'w'); // dump html source
+    fputs( $handle, $html);
+    fclose($handle);
+
+    $handle = fopen($dump_file, 'w'); // dump curl log
+    fputs( $handle, $res );
+    fclose($handle);
+
+    $dom = new DOMDocument; // dom解析の初期設定
+    $dom->preserveWhiteSpace = false;
+    @$dom->loadHTML($html);
+    $xp = new DOMXPath($dom);
+
+    $q = '//div[ @class = "pager-container" ]/span[ @class = "next" ]/a';
+    $res = $xp->query( $q );
+    if ( $res->length != 0 ){ // 次のページがある場合
+      $q = '//ul[ @class = "page-list" ]/li[last()]/a'; // 辿れる最後のページを取得
+      $res = $xp->query( $q );
+      foreach ( $res as $node ){
+        $page = $node->textContent; // page番号を取得
+      }
+    } else { //次のページがない場合. つまり,最後のページの場合
+      $q = '//ul[ @class = "_image-items" ]/li[ last() ]/a[ @class ]'; // 最後の作品をGet
+      $res = $xp->query( $q );
+      foreach( $res as $node ){
+        $matchs = array(); //マッチした全体は0,あとは括弧の数だけ要素が増えていく
+        preg_match( '/illust_id=(\d+)/', $node->getAttribute("href"), $matchs );
+      }
+      fputs( STDERR, "Succeed: Get a first artwork with user_id '" . $user_id . "' .\n" );
+      return $matchs[1]; // 作品のidだけ返す
+    }
+  }
+}
+
+function DownloadArtWork( $artwork_id, $display_name, $cookie_file ){
+
+  $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
+
+  $dump_file = 'log/download_artwork_' . $artwork_id . '.log';
+  $html_file = 'log/download_artwork_' . $artwork_id . '.html';
 
   $ch = curl_init($url); // curlの初期設定
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
-  curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を保存する
+  curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を読み込む
   curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
   $html = curl_exec($ch);
   $info = curl_getinfo($ch); // 実行結果
@@ -84,51 +162,142 @@ function GetFirstArtWorkId( $user_id, $page, $cookie_file ){
 
   $handle = fopen($html_file, 'w'); // dump html source
   fputs( $handle, $html);
-  fclose($handle);
+  fclose( $handle );
 
   $handle = fopen($dump_file, 'w'); // dump curl log
   fputs( $handle, $res );
-  fclose($handle);
+  fclose( $handle );
 
-  // print( $info['url'] . "\n" );
+  fputs( STDERR, "Start: Download a artwork with artwork_id '" . $artwork_id . "'.\n" );
 
   $dom = new DOMDocument;
   $dom->preserveWhiteSpace = false;
   @$dom->loadHTML($html);
   $xp = new DOMXPath($dom);
 
-  $q = '//div[ @class = "pager-container" ]/span[ @class = "next" ]/a';
+
+  // 日時データを取得
+  $q = '//ul[ @class = "meta" ]/li[1]';
   $res = $xp->query( $q );
-  if ( $res->length != 0 ){ // 次のページがある場合
-
-    $q = '//ul[ @class = "page-list" ]/li[last()]/a'; // 辿ることができる最後のページを取得
-    $res = $xp->query( $q );
-
-    foreach ( $res as $node ){
-      $page = $node->textContent;
+  if ( $res->length == 1 ){
+    foreach ( $res as $node ){ // なんちゃって1つだけ
+      $date = $node->textContent; // 最終的なmetaは$dateです.
+      $matchs = array();
+      preg_match_all( '/\d+/', $date, $matchs );
+      $date = sprintf( "%d_%02d%02d_%02d%02d", // year month day hour minitu
+        $matchs[0][0], $matchs[0][1], $matchs[0][2], $matchs[0][3], $matchs[0][4] );
     }
+  } else { fputs( STDERR, "Error Couldn't get artwork uploaded date.\n" ); }
 
-    GetFirstArtWorkId( $user_id, $page, $cookie_file );
 
-  } else { //次のページがない場合. つまり,最後のページの場合
-    $q = '//ul[ @class = "_image-items" ]/li[ last() ]/a[ @class ]';
-    $res = $xp->query( $q );
-
-    foreach( $res as $node ){
-      $matchs = array(); //マッチした全体は0,あとは括弧の数だけ要素が増えていく
-      preg_match( '/illust_id=(\d+)/', $node->getAttribute("href"), $matchs );
+  // タイトル回収
+  $q = '//div[ @class = "ui-expander-target" ]/h1'; // 1つめの
+  $res = $xp->query( $q );
+  if ( $res->length == 1 ){
+    foreach ( $res as $node ){ // なんちゃって1つだけ
+      $title = $node->textContent; // 最終的なmetaは$dateです.
     }
-
-    return $matchs[1]; // 作品のidだけ返す
   }
+
+  $q = '//section[ @class = "work-info" ]/h1'; // 2つめの
+  $res = $xp->query( $q );
+  if ( $res->length == 1 ){
+    foreach ( $res as $node ){ // なんちゃって1つだけ
+      $title = $node->textContent; // 最終的なmetaは$dateです.
+    }
+  }
+
+  if ( $title == '' ){ //タイトルないとの報告
+    fputs( STDERR, "Error Couldn't get artwork title.\n" );
+  } else { // ファイル名に使えない文字を置換
+    $title = preg_replace( '/(\\\|\/)/', '_', $title ); // スラ系はアンダーバーに変換
+  }
+
+
+  $artwork_stored_name = $date . '_' . $title; // 作品のファイル又はディレクトリ名
+
+
+  // イラストか判定 イラストだったらdlしてreturn 0
+  $q = '//div/div[ @class = "wrapper" ]/img'; // original url先を取得
+  $res = $xp->query( $q );
+  if ( $res->length == 1 ){
+    fputs( STDERR, "Mode is illust.\n" );
+    $referer = $url; // refererのせってい
+    foreach ( $res as $node ){
+      $img_url = $node->getAttribute('data-src'); // srcはクリックしないと表示されない
+      $matchs = array();
+      preg_match( '/\.(\w+)$/', $img_url, $matchs ); // 拡張子取り出し
+    }
+    $suffix = $matchs[1];
+    $file_path = 'images/' . $display_name . '/' . $artwork_stored_name . '.' . $suffix;
+    $order = '';
+    DownloadImage( $artwork_id, $img_url, $referer, $order, $file_path, $cookie_file );
+    return 0;
+  }
+
+
+  // マンガ検索 マンガだったらかDownloadMangaを行って return 0
+  $q = '//div[ @class = "works_display" ]/a';
+  $res = $xp->query( $q );
+  if ( $res->length == 1 ){
+    DownloadManga( $artwork_id, $display_name, $artwork_stored_name, $cookie_file );
+    return 0;
+  }
+
+  // うごいら判定 うごいらだったらDwonloadUgoiraを行って return 0
+
+  fputs( STDERR,
+    "Error: cannot download the artwork with artwork_id '" . $artwork_id . "'\n" );
+  return 1;
 }
 
-function DownloadArtWork( $artwork_id, $cookie_file ){
+function DownloadImage(
+  $artwork_id, $image_url, $referer, $order, $file_path, $cookie_file ){
 
-  $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
+  if ( $order == '' ){
+    $dump_file = 'log/download_image_' . $artwork_id . '.log';
+  } else {
+    $dump_file = 'log/download_image_' . $artwork_id . '_' . $order . '.log';
+  }
 
-  $dump_file = 'log/download_artwork' . $artwork_id . '.log';
-  $html_file = 'log/download_artwork' . $artwork_id . '.html';
+  $ch = curl_init($image_url); // curlの初期設定
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
+  curl_setopt($ch, CURLOPT_REFERER, $referer); // refererを設定
+  curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を読み込む
+  curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
+  $img = curl_exec($ch);
+  $info = curl_getinfo($ch); // 実行結果
+  curl_close($ch); // curl終了
+  $res = print_r($info, true);
+
+  $handle = fopen($dump_file, 'w'); // dump curl log
+  fputs( $handle, $res );
+  fclose( $handle );
+
+  $handle = fopen($file_path, 'w'); // dump html source
+  fputs( $handle, $img);
+  fclose( $handle );
+
+  if ( $info['http_code'] == 200 ){
+    fputs( STDERR,
+      "Succeed: Downloaded a image in $file_path\n" );
+    return 0;
+  } else {
+    fputs( STDERR,
+      "Error: failed a download image with artwork_id " . $artwork_id . "\n" );
+    return 1;
+  }
+
+}
+
+function DownloadManga( $artwork_id, $display_name, $artwork_stored_name, $cookie_file ){
+
+  fputs( STDERR, "Mode is mange.\n" );
+  $url = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id;
+
+  $dump_file = 'log/download_manga' . $artwork_id . '.log';
+  $html_file = 'log/download_manga' . $artwork_id . '.html';
 
   $ch = curl_init($url); // curlの初期設定
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
@@ -153,59 +322,83 @@ function DownloadArtWork( $artwork_id, $cookie_file ){
   @$dom->loadHTML($html);
   $xp = new DOMXPath($dom);
 
-
   // 日時データを取得
-  $q = '//ul[ @class = "meta" ]/li[1]';
+  $q = '//section/div[ @class = "item-container" ]/img';
   $res = $xp->query( $q );
-  foreach ( $res as $node ){ // なんちゃって1つだけ
-    $date = $node->textContent; // 最終的なmetaは$dateです.
+  $order = 0; // マンガのページ番号
+  $referer = $url; // refererの設定
+
+  $dir = 'images/'. $display_name . '/' . $artwork_stored_name;
+  if ( ! file_exists( $dir ) ){ // ファイルが存在するか
+    mkdir( $dir, 0777, true )
+      or die("Interrupt: Can't mkdir ". $dir ."'\n");
+  }
+
+  foreach ( $res as $node ){
+
+    $img_url = $node->getAttribute('data-src'); // srcはクリックしないと表示されない
+
     $matchs = array();
-    preg_match_all( '/\d+/', $date, $matchs );
-    $date = sprintf( "%d_%02d%02d_%02d%02d",
-      $matchs[0][0], $matchs[0][1], $matchs[0][2], $matchs[0][3], $matchs[0][4] );
+    preg_match( '/\.(\w+)$/', $img_url, $matchs ); // 拡張子取り出し
+    $suffix = $matchs[1];
+
+    $file_path = sprintf( // ファイルパス
+      'images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
+      $display_name , $artwork_stored_name, $order, $suffix);
+
+    DownloadImage( // 各画像をダウンロード
+      $artwork_id, $img_url, $referer, $order, $file_path, $cookie_file );
+    $order = $order + 1; // ページ番号をインクリメント
   }
 
-
-  // タイトル回収
-  $q = '//div[ @class = "ui-expander-target" ]/h1';
-  $res = $xp->query( $q );
-  foreach ( $res as $node ){ // なんちゃって1つだけ
-    $title = $node->textContent; // 最終的なmetaは$dateです.
-  }
-
-
-  // イラスト検索
-  $q = '//div[ @class = "works_display" ]/div/img';
-  $res = $xp->query( $q );
-  if ( $res->length == 1 ){
-    $mode = 'illust';
-    foreach ( $res as $node ){
-      $url = $node->getAttribute('src');
-    }
-  }
-
-  // マンガ検索
-  $q = '//div[ @class = "works_display" ]/a';
-  $res = $xp->query( $q );
-  if ( $res->length == 1 ){
-    $mode = 'manga';
-    foreach ( $res as $node ){
-      $url = $node->getAttribute('href');
-    }
-    $url = 'http://www.pixiv.net/' . $url;
-  }
-
-
-  print $mode . "\n";
-
-  // if ( $mode == 'manga' ) { // manga
-  // } elseif ( $mode == 'ugoira' ) { // ugoira
-  // } else { // illust
-  // }
-
-  print $date . '_' . $title . "\n";
-  print $url . "\n";
   return 0;
+}
+
+function NextArtworkExist( $artwork_id, $cookie_file ){
+
+  $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
+
+  $dump_file = 'log/next_artwork_id_' . $artwork_id . '.log';
+  $html_file = 'log/next_artwork_id_' . $artwork_id . '.html';
+
+  $ch = curl_init($url); // curlの初期設定
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
+  curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を読み込む
+  curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
+  $html = curl_exec($ch);
+  $info = curl_getinfo($ch); // 実行結果
+  curl_close($ch); // curl終了
+  $res = print_r($info, true);
+
+  $handle = fopen($html_file, 'w'); // dump html source
+  fputs( $handle, $html);
+  fclose( $handle );
+
+  $handle = fopen($dump_file, 'w'); // dump curl log
+  fputs( $handle, $res );
+  fclose( $handle );
+
+  $dom = new DOMDocument;
+  $dom->preserveWhiteSpace = false;
+  @$dom->loadHTML($html);
+  $xp = new DOMXPath($dom);
+
+  $q = '//ul/li[ @class = "before" ]/a'; // 次の作品
+  $res = $xp->query( $q );
+
+
+  if ( $res->length == 1 ){ // 次のページがあるとき
+    foreach( $res as $node ){
+      $matchs = array(); // 次のillust_idを探す
+      preg_match( '/illust_id=(\d+)/', $node->getAttribute("href"), $matchs );
+      $next_artwork_id = $matchs[1];
+    }
+    return $next_artwork_id;
+  } else { // 次のページがないとき
+    fputs( STDERR, "This artwork_id '" . $artwork_id . "' is the latest.\n" );
+    return $artwork_id; // 同じartwork_idを返す
+  }
 }
 
 ?>
