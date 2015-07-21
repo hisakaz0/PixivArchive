@@ -245,6 +245,33 @@ function DownloadArtWork( $artwork_id, $display_name, $cookie_file ){
   }
 
   // うごいら判定 うごいらだったらDwonloadUgoiraを行って return 0
+  $matchs = array();
+  $pattern = '/pixiv\.context\.ugokuIllustFullscreenData\s*=\s*{"?src"?:"?([\/\\\\\-:\.\w]+)"?,/';
+  preg_match( $pattern, $html , $matchs );
+  if ( $matchs[1] != '' ){ // urlが獲得できたとき
+    fputs( STDERR, "Mode is ugoira.\n" );
+    $referer = $url;
+    $ugoira_url = preg_replace( '/\\\\/', '', $matchs[1] ); // うごいらのzip のurl
+    $order = ''; // うごいらに順番なんてない
+    $dir_path  = 'images/' . $display_name . '/' . $artwork_stored_name;
+    $file_path =  $dir_path . '/ugoira.zip';
+    mkdir( $dir_path, 0777, true ) //フォルダ作成
+      or die("Interrupt: Can't mkdir ". $dir_path ."'\n");
+    DownloadImage(
+      $artwork_id, $ugoira_url, $referer, $order, $file_path, $cookie_file );
+    $zip = new ZipArchive;
+    if ( $zip->open( $file_path ) === TRUE ) { // ファイルオープンが成功
+      $zip->extractTo( $dir_path ); // 解凍先
+      $zip->close();
+      fputs( STDERR, "Succeed: Extract a zip file '$file_path'\n\tto '$dir_path'.\n" );
+      unlink( $file_path );
+      fputs( STDERR, "Succeed: Remove a zip file '$file_path'.\n" );
+    } else {
+      fputs( STDERR, "Error: Couldn't remove a zip file '$file_path'.\n" );
+    }
+    return 0;
+  }
+
 
   fputs( STDERR,
     "Error: cannot download the artwork with artwork_id '" . $artwork_id . "'\n" );

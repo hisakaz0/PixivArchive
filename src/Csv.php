@@ -21,7 +21,7 @@ function ReadCsv ( $file ){
 
     // Error Cacht
     if ( $user_id != '' ){  // 空じゃないとき
-      if ( preg_grep( '/^\d+$/', $user_id ) ){ // user_idは数字だけのときだけ許す
+      if ( @preg_grep( '/^\d+$/', $user_id ) ){ // user_idは数字だけのときだけ許す
         fputs(STDERR, "Error: user_id is only digit.\n");
         exit( 1 );
       }
@@ -31,7 +31,7 @@ function ReadCsv ( $file ){
     }
 
     if( $last_artwork_id != '' ){   // last_artwork_idがからのとき
-      if ( preg_grep( '/^\d+$/', $last_artwork_id ) ){ // last_artwork_idは数字だけ
+      if ( @preg_grep( '/^\d+$/', $last_artwork_id ) ){ // last_artwork_idは数字だけ
         fputs(STDERR, "Error: last_artwork_id is only digit.\n");
         exit( 1 );
       }
