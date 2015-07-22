@@ -47,10 +47,9 @@ function WriteCsv ( $userlist, $userlist_file ){
 
   $handle = fopen( $userlist_file, 'w' );
 
-  fputs( $handle, "user_id,last_artwork_id\n" ); // 列名を初めにかく
+  fputs( $handle, "user_id,last_artwork_id,display_name\n" ); // 列名を初めにかく
   foreach( $userlist as $user ){
-    fputs( $handle, $user[0] . ',' . $user[1] . ',' . $user[2] .  "\n" ); // 書き出し
-    fputs( STDERR, "user_id: $user[0] / last_artwork_id: $user[1] / display_name: $user[2]\n" );
+    fputs( $handle, $user[0] . ',' . @$user[1] . ',' . @$user[2] .  "\n" ); // 書き出し
   }
 
   fclose( $handle );

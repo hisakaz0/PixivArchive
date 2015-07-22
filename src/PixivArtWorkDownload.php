@@ -1,22 +1,20 @@
 <?php
 
 
-function PixivArtWorkDownload ( $userlist ){
+function PixivArtWorkDownload ( $userlist, $userlist_file ){
 
-  $store_userlist = array();
-
-  foreach ( $userlist as $user ){ // 一つ一つ取り出し
+  for ( $i = 0; $i < count( $userlist ); $i++ ){ // 一つ一つ取り出し
 
     // ユーザ情報を user_id, last_artwork_id, display_nameに分解
-    $user_id = $user['user_id'];
-    $last_artwork_id = $user['last_artwork_id'];
-    $display_name = $user['display_name'];
+    $user_id         = $userlist[$i]['user_id'];
+    @$last_artwork_id = $userlist[$i]['last_artwork_id'];
+    @$display_name    = $userlist[$i]['display_name'];
 
     if ( $display_name == '' ){ //ディスプレイネームが設定されていない
       list( $user_exist, $display_name ) = UserCheck( $user_id );
     } else { // されている
       list( $user_exist, $display_name ) = UserCheck( $user_id );
-      $display_name = $user['display_name'];
+      $display_name = $userlist[$i]['display_name'];
     }
 
     if ( $user_exist == 0 ){ // user exsit
@@ -38,13 +36,13 @@ function PixivArtWorkDownload ( $userlist ){
       $last_artwork_id = AllDownloadArtWork(
         $current_artwork_id, $user_id ); // 最新の作品までdonwnload
 
-      $user = array( // last_artwork_idを更新する.
-        $user_id, $last_artwork_id, $display_name );
-      array_push( $store_userlist, $user ); // store_userlistに更新
+      $userlist[$i]['last_artwork_id'] = $last_artwork_id;
+
+      WriteCsv ( $userlist, $userlist_file ); //書き込み
     }
   }
 
-  return $store_userlist;
+
 }
 
 function UserCheck( $user_id ){
@@ -221,8 +219,10 @@ function DownloadArtWork( $artwork_id, $user_id ){
     $order = ''; // うごいらに順番なんてない
     $dir_path  = '.images/' . $user_id. '/' . $artwork_stored_name;
     $file_path =  $dir_path . '/ugoira.zip';
-    mkdir( $dir_path, 0777, true ) //フォルダ作成
-      or die("Interrupt: Can't mkdir ". $dir_path ."'\n");
+    if ( ! file_exists( $dir_path ) ) {
+      mkdir( $dir_path, 0777, true ) //フォルダ作成
+        or die("Interrupt: Can't mkdir ". $dir_path ."'\n");
+    }
     DownloadContent(
       $artwork_id, $url, $referer, $order, $file_path );
     $zip = new ZipArchive;

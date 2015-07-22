@@ -31,12 +31,13 @@ fi
 
 IMAGE_DIR_ABS=$(cd $(dirname $IMAGE_DIR) && pwd)/$(basename $IMAGE_DIR)
 LINE=`wc -l $USERLIST_FILE | grep -Eo ' *\d+ *' | grep -Eo '\d+'` #数字だけ
+rm -rf $LINK_DIR/* # ゴミ削除
 for ROW in `tail -n $((LINE - 1)) $USERLIST_FILE`
 do
   ID=`echo $ROW | cut -d ',' -f1`
   NAME=`echo $ROW | cut -d ',' -f3`
   if [ -n $NAME ]; then
-    ln -sf "$IMAGE_DIR_ABS/$ID" "$LINK_DIR/$NAME"
+    ln -f "$IMAGE_DIR_ABS/$ID" "$LINK_DIR/$NAME"
     echo ln -sf "$IMAGE_DIR_ABS/$ID" "$LINK_DIR/$NAME"
   fi
 done

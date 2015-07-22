@@ -5,6 +5,16 @@
 require_once dirname(__file__) . '/src/CookieLogin.php';
 require_once dirname(__file__) . '/src/Csv.php';
 require_once dirname(__file__) . '/src/PixivArtWorkDownload.php';
+require_once dirname(__file__) . '/lib/ansi-color.php';
+
+use PhpAnsiColor\Color;
+
+$msg = array(
+  'interrupt' => Color::set("Interrupt", "blue+bold"),
+  'succeed'   => Color::set("Succeed", "green+bold"),
+  'error'     => Color::set("Error", "red+bold+underline"),
+  'started'   => Color::set("Started", "yellow+bold")
+);
 
 $cookie_file            = $argv[1]; // login.phpで作成したcookie_file
 $userlist_file          = $argv[2]; // imageをdlをするための設定ファイル群
@@ -46,10 +56,7 @@ $userlist = ReadCsv( $userlist_file );
 
 # 童貞が喜ぶぐへへな画像をdl
 # 世界の中心はここね❤
-$store_userlist = PixivArtWorkDownload( $userlist );
-
-// csvへlast_artwork_idを更新して書き込み
-WriteCsv( $store_userlist, $userlist_file );
+PixivArtWorkDownload( $userlist, $userlist_file );
 
 exit( 0 );
 
