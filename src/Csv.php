@@ -50,9 +50,9 @@ function WriteCsv ( $userlist, $userlist_file ){
   fputs( $handle, "user_id,last_artwork_id,display_name\n" ); // 列名を初めにかく
   foreach( $userlist as $user ){
     fputs( $handle,
-      $user['user_id'] . ',' . 
+      $user['user_id'] . ',' .
       @$user['last_artwork_id'] . ',' .
-      @$user['display_name'] .  "\n" 
+      @$user['display_name'] .  "\n"
     ); // 書き出し
   }
 
