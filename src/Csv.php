@@ -49,7 +49,11 @@ function WriteCsv ( $userlist, $userlist_file ){
 
   fputs( $handle, "user_id,last_artwork_id,display_name\n" ); // 列名を初めにかく
   foreach( $userlist as $user ){
-    fputs( $handle, $user[0] . ',' . @$user[1] . ',' . @$user[2] .  "\n" ); // 書き出し
+    fputs( $handle,
+      $user['user_id'] . ',' . 
+      @$user['last_artwork_id'] . ',' .
+      @$user['display_name'] .  "\n" 
+    ); // 書き出し
   }
 
   fclose( $handle );

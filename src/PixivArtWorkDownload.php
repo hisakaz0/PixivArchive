@@ -6,7 +6,7 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
   for ( $i = 0; $i < count( $userlist ); $i++ ){ // 一つ一つ取り出し
 
     // ユーザ情報を user_id, last_artwork_id, display_nameに分解
-    $user_id         = $userlist[$i]['user_id'];
+     $user_id         = $userlist[$i]['user_id'];
     @$last_artwork_id = $userlist[$i]['last_artwork_id'];
     @$display_name    = $userlist[$i]['display_name'];
 
@@ -37,12 +37,11 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
         $current_artwork_id, $user_id ); // 最新の作品までdonwnload
 
       $userlist[$i]['last_artwork_id'] = $last_artwork_id;
+      $userlist[$i]['display_name']    = $display_name;
 
       WriteCsv ( $userlist, $userlist_file ); //書き込み
     }
   }
-
-
 }
 
 function UserCheck( $user_id ){

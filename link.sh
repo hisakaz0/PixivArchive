@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 IMAGE_DIR=$1
 LINK_DIR=$2
 USERLIST_FILE=$3
@@ -30,8 +29,9 @@ else #無い場合作る
 fi
 
 IMAGE_DIR_ABS=$(cd $(dirname $IMAGE_DIR) && pwd)/$(basename $IMAGE_DIR)
-LINE=`wc -l $USERLIST_FILE | grep -Eo ' *\d+ *' | grep -Eo '\d+'` #数字だけ
+LINE=`wc -l $USERLIST_FILE | grep -Eo ' *[0-9]+ *' | grep -Eo '[0-9]+'` #数字だけ
 rm -rf $LINK_DIR/* # ゴミ削除
+IFS=$'\n'
 for ROW in `tail -n $((LINE - 1)) $USERLIST_FILE`
 do
   ID=`echo $ROW | cut -d ',' -f1`

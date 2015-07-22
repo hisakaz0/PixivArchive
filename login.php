@@ -63,6 +63,10 @@ if ( $argv[3] == '' ){ // クッキーファイルに指定がない場合
 $pixiv_id = $argv[1];
 $password = $argv[2];
 
+if ( ! file_exists( 'log/login' ) ){
+  mkdir( 'log/login', 0777, true ) or
+    die("Interrupt: Can't mkdir " . $dir ."'\n"); // 事故があったらえんだー
+}
 login( $pixiv_id, $password, $cookie_file );
 
 ?>
