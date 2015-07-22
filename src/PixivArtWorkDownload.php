@@ -9,16 +9,18 @@ function PixivArtWorkDownload ( $userlist, $cookie_file ){
     // ユーザ情報を user_id, last_artwork_id, display_nameに分解
     $user_id = $user['user_id'];
     $last_artwork_id = $user['last_artwork_id'];
-    $display_name = $user_id; // 表示名にuser_idを使う
 
-    if ( UserCheck( $user_id, $cookie_file ) == 0 ){ // user exsit
+    if ( $user['display_name'] == '' ){ //ディスプレイネームが設定されていない
+      list( $user_exist, $display_name ) = UserCheck( $user_id, $cookie_file );
+    } else { // されている
+      list( $user_exist, $display_name ) = UserCheck( $user_id, $cookie_file );
+      $display_name = $user['display_name'];
+    }
 
-      if ( $display_name == '' ){ // display_nameが空だったら
-        $display_name = $user_id; // 表示名にuser_idを使う
-      }
+    if ( $user_exist == 0 ){ // user exsit
 
       if ( $last_artwork_id == '' ){ // last_artwork_idがnull 初めてのご利用
-        $dir = 'images/' . $display_name; // ユーザのディレクトリ
+        $dir = 'images/' . $user_id; // ユーザのディレクトリ
         if ( ! file_exists( $dir ) ){ // フォルダが作られているか
           mkdir( $dir, 0777, true ) // なかったら作る
             or die("Interrupt: Can't mkdir " . $dir ."'\n"); // 事故があったらえんだー
@@ -26,15 +28,17 @@ function PixivArtWorkDownload ( $userlist, $cookie_file ){
         $page = 1; // 最新のページ
         $current_artwork_id = GetFirstArtWorkId( $user_id, $page, $cookie_file ); //処女get
         DownloadArtWork( // 先頭の作品をdl
-          $current_artwork_id, $display_name, $cookie_file );
+          $current_artwork_id, $user_id, $cookie_file );
       } else {
         $current_artwork_id = $last_artwork_id; // 注目している作品
       }
 
       $last_artwork_id = AllDownloadArtWork(
-        $current_artwork_id, $display_name, $cookie_file ); // 最新の作品までdonwnload
-      $user = array( $user_id, $last_artwork_id ); // last_artwork_idを更新する.
-      array_push( $store_userlist, $user );
+        $current_artwork_id, $user_id, $cookie_file ); // 最新の作品までdonwnload
+
+      $user = array( // last_artwork_idを更新する.
+        $user_id, $last_artwork_id, $display_name );
+      array_push( $store_userlist, $user ); // store_userlistに更新
     }
   }
 
@@ -66,21 +70,37 @@ function UserCheck( $user_id, $cookie_file ){
   fclose($handle);
 
   if ( $info['http_code'] != '404' ){ // ユーザが存在するかどうか
+
+    $dom = new DOMDocument;
+    $dom->preserveWhiteSpace = false;
+    @$dom->loadHTML($html);
+    $xp = new DOMXPath($dom);
+
+    $q = '//a[ @class = "user-link" ]/h1[ @class = "user" ]';
+    $res = $xp->query( $q );
+
+    if ( $res->length == 1 ){
+      foreach ( $res as $node ){
+        $display_name = $node->textContent;
+      }
+    }
+
+    fputs( STDERR, "Succeed: user_id '$user_id' / display_name '$display_name' is exist!.\n"); //いた
     fputs( STDERR, "Start: Download artworks of user_id '$user_id'.\n"); //いた
-    return 0;
+    return array( 0, $display_name );
   } else { // ユーザが存在しない
     fputs( STDERR, "Error: user_id '$user_id' is not exsit!\n"); // そんなユーザいねぇ
-    return 1;
+    return array( 1, '' );
   }
 }
 
-function AllDownloadArtWork( $current_artwork_id, $display_name, $cookie_file ){
+function AllDownloadArtWork( $current_artwork_id, $user_id, $cookie_file ){
 
   while( true ){
     //  次の作品のidを拾ってくる ない場合は今見ている作品のid
     $next_artwork_id = NextArtworkExist( $current_artwork_id, $cookie_file );
     if ( $next_artwork_id != $current_artwork_id ){ // 次の作品があるとき
-      DownloadArtWork( $next_artwork_id, $display_name, $cookie_file );
+      DownloadArtWork( $next_artwork_id, $user_id, $cookie_file );
       $current_artwork_id = $next_artwork_id; // 注目点を次に移す
     } else { // 次の作品が無いとき
       return $current_artwork_id; // 現在のartwork_idを返却
@@ -89,7 +109,6 @@ function AllDownloadArtWork( $current_artwork_id, $display_name, $cookie_file ){
 }
 
 function GetFirstArtWorkId( $user_id, $page, $cookie_file ){
-
 
   while ( true ){
 
@@ -143,7 +162,7 @@ function GetFirstArtWorkId( $user_id, $page, $cookie_file ){
   }
 }
 
-function DownloadArtWork( $artwork_id, $display_name, $cookie_file ){
+function DownloadArtWork( $artwork_id, $user_id, $cookie_file ){
 
   $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
 
@@ -229,7 +248,7 @@ function DownloadArtWork( $artwork_id, $display_name, $cookie_file ){
       preg_match( '/\.(\w+)$/', $img_url, $matchs ); // 拡張子取り出し
     }
     $suffix = $matchs[1];
-    $file_path = 'images/' . $display_name . '/' . $artwork_stored_name . '.' . $suffix;
+    $file_path = 'images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
     $order = '';
     DownloadImage( $artwork_id, $img_url, $referer, $order, $file_path, $cookie_file );
     return 0;
@@ -240,7 +259,7 @@ function DownloadArtWork( $artwork_id, $display_name, $cookie_file ){
   $q = '//div[ @class = "works_display" ]/a';
   $res = $xp->query( $q );
   if ( $res->length == 1 ){
-    DownloadManga( $artwork_id, $display_name, $artwork_stored_name, $cookie_file );
+    DownloadManga( $artwork_id, $user_id, $artwork_stored_name, $cookie_file );
     return 0;
   }
 
@@ -253,7 +272,7 @@ function DownloadArtWork( $artwork_id, $display_name, $cookie_file ){
     $referer = $url;
     $ugoira_url = preg_replace( '/\\\\/', '', $matchs[1] ); // うごいらのzip のurl
     $order = ''; // うごいらに順番なんてない
-    $dir_path  = 'images/' . $display_name . '/' . $artwork_stored_name;
+    $dir_path  = 'images/' . $user_id. '/' . $artwork_stored_name;
     $file_path =  $dir_path . '/ugoira.zip';
     mkdir( $dir_path, 0777, true ) //フォルダ作成
       or die("Interrupt: Can't mkdir ". $dir_path ."'\n");
@@ -318,7 +337,7 @@ function DownloadImage(
 
 }
 
-function DownloadManga( $artwork_id, $display_name, $artwork_stored_name, $cookie_file ){
+function DownloadManga( $artwork_id, $user_id, $artwork_stored_name, $cookie_file ){
 
   fputs( STDERR, "Mode is mange.\n" );
   $url = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id;
@@ -355,7 +374,7 @@ function DownloadManga( $artwork_id, $display_name, $artwork_stored_name, $cooki
   $order = 0; // マンガのページ番号
   $referer = $url; // refererの設定
 
-  $dir = 'images/'. $display_name . '/' . $artwork_stored_name;
+  $dir = 'images/'. $user_id. '/' . $artwork_stored_name;
   if ( ! file_exists( $dir ) ){ // ファイルが存在するか
     mkdir( $dir, 0777, true )
       or die("Interrupt: Can't mkdir ". $dir ."'\n");
@@ -371,7 +390,7 @@ function DownloadManga( $artwork_id, $display_name, $artwork_stored_name, $cooki
 
     $file_path = sprintf( // ファイルパス
       'images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
-      $display_name , $artwork_stored_name, $order, $suffix);
+      $user_id, $artwork_stored_name, $order, $suffix);
 
     DownloadImage( // 各画像をダウンロード
       $artwork_id, $img_url, $referer, $order, $file_path, $cookie_file );
