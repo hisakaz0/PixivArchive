@@ -51,7 +51,7 @@ function UserCheck( $user_id ){
   $url = 'http://www.pixiv.net/member.php?id=' . $user_id;
   $log_file_name = 'user_check_' . $user_id ;
 
-  list( $html, $info ) = Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
   HtmlDump( $html, $log_file_name );
 
   if ( $info['http_code'] != '404' ){ // ユーザが存在するかどうか
@@ -65,13 +65,18 @@ function UserCheck( $user_id ){
       }
     }
 
-    fputs( STDERR, "Succeed: user_id '$user_id' / display_name '$display_name' is exist!.\n"); //いた
-    fputs( STDERR, "Start: Download artworks of user_id '$user_id'.\n"); //いた
+    fputs( STDERR,
+      "Succeed: user_id '$user_id' / display_name '$display_name' is exist!.\n"); //いた
+    fputs( STDERR,
+      "Start: Download artworks of user_id '$user_id'.\n"); //いた
+
     return array( 0, $display_name );
 
   } else { // ユーザが存在しない
+
     fputs( STDERR, "Error: user_id '$user_id' is not exsit!\n"); // そんなユーザいねぇ
     return array( 1, '' );
+
   }
 }
 
@@ -79,7 +84,7 @@ function AllDownloadArtWork( $current_artwork_id, $user_id ){
 
   while( true ){
     //  次の作品のidを拾ってくる ない場合は今見ている作品のid
-    $next_artwork_id = NextArtworkExist( $current_artwork_id );
+    $next_artwork_id = NextArtWorkExist( $current_artwork_id );
     if ( $next_artwork_id != $current_artwork_id ){ // 次の作品があるとき
       DownloadArtWork( $next_artwork_id, $user_id );
       $current_artwork_id = $next_artwork_id; // 注目点を次に移す
@@ -97,7 +102,7 @@ function GetFirstArtWorkId( $user_id, $page ){
       . 'id=' . $user_id . '&type=all' . '&p=' . $page;
     $log_file_name = 'first_artwork_id_' . $user_id;
 
-    list( $html, $info )= Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+    list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
     HtmlDump( $html, $log_file_name );
 
     $q = '//a[ @class = "user-link" ]/h1[ @class = "user" ]';
@@ -116,6 +121,7 @@ function GetFirstArtWorkId( $user_id, $page ){
         $matchs = array(); //マッチした全体は0,あとは括弧の数だけ要素が増えていく
         preg_match( '/illust_id=(\d+)/', $node->getAttribute("href"), $matchs );
       }
+
       fputs( STDERR, "Succeed: Get a first artwork with user_id '" . $user_id . "' .\n" );
       return $matchs[1]; // 作品のidだけ返す
     }
@@ -127,7 +133,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
   $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
   $log_file_name = 'download_artwork_' . $artwork_id;
 
-  list( $html, $info )= Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
   HtmlDump( $html, $log_file_name );
 
   fputs( STDERR, "Start: Download a artwork with artwork_id '" . $artwork_id . "'.\n" );
@@ -144,7 +150,9 @@ function DownloadArtWork( $artwork_id, $user_id ){
       $date = sprintf( "%d_%02d%02d_%02d%02d", // year month day hour minitu
         $matchs[0][0], $matchs[0][1], $matchs[0][2], $matchs[0][3], $matchs[0][4] );
     }
-  } else { fputs( STDERR, "Error Couldn't get artwork uploaded date.\n" ); }
+  } else { 
+    fputs( STDERR, "Error Couldn't get artwork uploaded date.\n" ); 
+  }
 
 
   // タイトル回収
@@ -197,6 +205,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
   $q = '//div[ @class = "works_display" ]/a';
   $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
+    fputs( STDERR, "Mode is mange.\n" );
     DownloadManga( $artwork_id, $user_id, $artwork_stored_name );
     return 0;
   }
@@ -245,7 +254,7 @@ function DownloadContent(
   }
 
   list( $html, $info ) =
-    Curl( $url, $log_file_name, $referer ); // urlからcontentを引っ張ってくる
+    @Curl( $url, $log_file_name, $referer ); // urlからcontentを引っ張ってくる
 
   if ( $info['http_code'] == 200 ){
     fputs( STDERR,
@@ -260,10 +269,10 @@ function DownloadContent(
 
 function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
 
-  fputs( STDERR, "Mode is mange.\n" );
   $url = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id;
+  $log_file_name = 'donwnload_manga_' . $$artwork_id;
 
-  list( $html, $info ) = Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
   HtmlDump( $html, $log_file_name );
 
   // 日時データを取得
@@ -272,17 +281,16 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
   $order = 0; // マンガのページ番号
   $referer = $url; // refererの設定
 
+
   $dir = 'images/'. $user_id. '/' . $artwork_stored_name;
   if ( ! file_exists( $dir ) ){ // ファイルが存在するか
-    mkdir( $dir, 0777, true )
-      or die("Interrupt: Can't mkdir ". $dir ."'\n");
+    mkdir( $dir, 0777, true ) or die("Interrupt: Can't mkdir ". $dir ."'\n");
   }
+
 
   foreach ( $res as $node ){
 
     $url = $node->getAttribute('data-src'); // srcはクリックしないと表示されない
-
-    $matchs = array();
     preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
     $suffix = $matchs[1];
 
@@ -298,12 +306,12 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
   return 0;
 }
 
-function NextArtworkExist( $artwork_id, $cookie_file ){
+function NextArtWorkExist( $artwork_id ){
 
   $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
   $log_file_name = 'next_artwork_id_' . $artwork_id;
 
-  list( $html, $info ) = Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
   HtmlDump( $html, $log_file_name );
 
   $q = '//ul/li[ @class = "before" ]/a'; // 次の作品
@@ -322,12 +330,11 @@ function NextArtworkExist( $artwork_id, $cookie_file ){
   }
 }
 
-
 function HtmlDump( $html, $log_file_name ){
 
   global $session_id;
 
-  $handle = fopen( 'log/' . $session_id . '/' . $log_file_name .'.html', 'w' );
+  $handle = fopen( 'log/dl/' . $session_id . '/' . $log_file_name .'.html', 'w' );
   fputs( $handle, $html );
   fclose( $handle );
 }
@@ -345,7 +352,7 @@ function HtmlParse( $html, $q ){
 function Curl( $url, $log_file_name, $referer ){
 
   global $session_id, $cookie_file;
-  $dump_file = 'log/' . $session_id . '/' . $log_file_name . '.log' ;
+  $log_file = 'log/dl/' . $session_id . '/' . $log_file_name . '.log' ;
 
   $ch = curl_init( $url ); // curlの初期設定
   curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, true ); // redirectionを有効化
@@ -361,12 +368,13 @@ function Curl( $url, $log_file_name, $referer ){
 
   $info = curl_getinfo( $ch ); // 実行結果
   curl_close( $ch ); // curl終了
-  $info = print_r( $info, true );
+  $info_text = print_r( $info, true );
 
   $handle = fopen( $log_file, 'w' ); //write curl log
-  fputs( $handle, $res );
+  fputs( $handle, $info_text );
   fclose( $handle );
 
   return array( $content, $info );
+
 }
 ?>

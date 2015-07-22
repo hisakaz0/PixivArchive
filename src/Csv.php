@@ -15,9 +15,9 @@ function ReadCsv ( $file ){
 
   foreach ( $dumplist as $row ){
 
-    $user_id         = $row[0];
-    $last_artwork_id = $row[1];
-    $display_name    = $row[2];
+    @$user_id         = $row[0];
+    @$last_artwork_id = $row[1];
+    @$display_name    = $row[2];
 
     // Error Cacht
     if ( empty( $user_id ) != true ){  // 空じゃないとき

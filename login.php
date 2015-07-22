@@ -12,8 +12,12 @@ function login($pixiv_id, $password, $cookie_file){
     'skip' => '1'
   );
 
-  $dump_file = 'log/login.log';
-  $html_file = 'log/login.html';
+
+  date_default_timezone_set('Asia/Tokyo');
+  $session_id = date('ymdHis'); // セッションごとにlogフォルダを生成
+
+  $dump_file = 'log/login/login_' . $session_id . '.log';
+  $html_file = 'log/login/login_' . $session_id . '.html';
 
   //  cookieの取得
   $handle = fopen($html_file, 'w');
