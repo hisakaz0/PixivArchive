@@ -10,8 +10,9 @@ function PixivArtWorkDownload ( $userlist ){
     // ユーザ情報を user_id, last_artwork_id, display_nameに分解
     $user_id = $user['user_id'];
     $last_artwork_id = $user['last_artwork_id'];
+    $display_name = $user['display_name'];
 
-    if ( $user['display_name'] == '' ){ //ディスプレイネームが設定されていない
+    if ( $display_name == '' ){ //ディスプレイネームが設定されていない
       list( $user_exist, $display_name ) = UserCheck( $user_id );
     } else { // されている
       list( $user_exist, $display_name ) = UserCheck( $user_id );
@@ -105,12 +106,11 @@ function GetFirstArtWorkId( $user_id, $page ){
     list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
     HtmlDump( $html, $log_file_name );
 
-    $q = '//a[ @class = "user-link" ]/h1[ @class = "user" ]';
+
+    $q = '//ul[ @class = "page-list" ]/li[last()]/a'; // 辿れる最後のページを取得
     $res = HtmlParse( $html, $q );
 
     if ( $res->length != 0 ){ // 次のページがある場合
-      $q = '//ul[ @class = "page-list" ]/li[last()]/a'; // 辿れる最後のページを取得
-      $res = HtmlParse( $html, $q );
       foreach ( $res as $node ){
         $page = $node->textContent; // page番号を取得
       }
@@ -150,8 +150,8 @@ function DownloadArtWork( $artwork_id, $user_id ){
       $date = sprintf( "%d_%02d%02d_%02d%02d", // year month day hour minitu
         $matchs[0][0], $matchs[0][1], $matchs[0][2], $matchs[0][3], $matchs[0][4] );
     }
-  } else { 
-    fputs( STDERR, "Error Couldn't get artwork uploaded date.\n" ); 
+  } else {
+    fputs( STDERR, "Error Couldn't get artwork uploaded date.\n" );
   }
 
 
@@ -189,14 +189,14 @@ function DownloadArtWork( $artwork_id, $user_id ){
     fputs( STDERR, "Mode is illust.\n" );
     $referer = $url; // refererのせってい
     foreach ( $res as $node ){
-      $img_url = $node->getAttribute('data-src'); // srcはクリックしないと表示されない
+      $url = $node->getAttribute('data-src'); // srcはクリックしないと表示されない
       $matchs = array();
-      preg_match( '/\.(\w+)$/', $img_url, $matchs ); // 拡張子取り出し
+      preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
     }
     $suffix = $matchs[1];
     $file_path = '.images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
     $order = '';
-    DownloadContent( $artwork_id, $img_url, $referer, $order, $file_path );
+    DownloadContent( $artwork_id, $url, $referer, $order, $file_path );
     return 0;
   }
 
@@ -217,14 +217,14 @@ function DownloadArtWork( $artwork_id, $user_id ){
   if ( $matchs[1] != '' ){ // urlが獲得できたとき
     fputs( STDERR, "Mode is ugoira.\n" );
     $referer = $url;
-    $ugoira_url = preg_replace( '/\\\\/', '', $matchs[1] ); // うごいらのzip のurl
+    $url = preg_replace( '/\\\\/', '', $matchs[1] ); // うごいらのzip のurl
     $order = ''; // うごいらに順番なんてない
     $dir_path  = '.images/' . $user_id. '/' . $artwork_stored_name;
     $file_path =  $dir_path . '/ugoira.zip';
     mkdir( $dir_path, 0777, true ) //フォルダ作成
       or die("Interrupt: Can't mkdir ". $dir_path ."'\n");
     DownloadContent(
-      $artwork_id, $ugoira_url, $referer, $order, $file_path );
+      $artwork_id, $url, $referer, $order, $file_path );
     $zip = new ZipArchive;
     if ( $zip->open( $file_path ) === TRUE ) { // ファイルオープンが成功
       $zip->extractTo( $dir_path ); // 解凍先
@@ -257,9 +257,14 @@ function DownloadContent(
     @Curl( $url, $log_file_name, $referer ); // urlからcontentを引っ張ってくる
 
   if ( $info['http_code'] == 200 ){
-    fputs( STDERR,
-      "Succeed: Downloaded a image in $file_path\n" );
+
+    $handle = fopen( $file_path, 'w' ); // 画像やzipを書き込み
+    fputs( $handle, $html );
+    fclose( $handle );
+
+    fputs( STDERR, "Succeed: Downloaded a image in $file_path\n" );
     return 0;
+
   } else {
     fputs( STDERR,
       "Error: failed a download image with artwork_id " . $artwork_id . "\n" );
@@ -269,17 +274,12 @@ function DownloadContent(
 
 function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
 
-  $url = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id;
-  $log_file_name = 'donwnload_manga_' . $$artwork_id;
+  $url     = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id;
+  $referer = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
+  $log_file_name = 'donwnload_manga_' . $artwork_id;
 
-  list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url, $log_file_name, $referer );
   HtmlDump( $html, $log_file_name );
-
-  // 日時データを取得
-  $q = '//section/div[ @class = "item-container" ]/img';
-  $res = HtmlParse( $html, $q );
-  $order = 0; // マンガのページ番号
-  $referer = $url; // refererの設定
 
 
   $dir = '.images/'. $user_id. '/' . $artwork_stored_name;
@@ -287,10 +287,14 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
     mkdir( $dir, 0777, true ) or die("Interrupt: Can't mkdir ". $dir ."'\n");
   }
 
+  $q = '//section/div[ @class = "item-container" ]/img';// original-img url
+  $res = HtmlParse( $html, $q );
+  $order = 0; // マンガのページ番号
+  $referer = $url; // refererの設定
 
   foreach ( $res as $node ){
 
-    $url = $node->getAttribute('data-src'); // srcはクリックしないと表示されない
+    $url = $node->getAttribute('data-src'); //  srcは実際に表示されているとき
     preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
     $suffix = $matchs[1];
 
@@ -299,7 +303,7 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
       $user_id, $artwork_stored_name, $order, $suffix);
 
     DownloadContent( // 各画像をダウンロード
-      $artwork_id, $img_url, $referer, $order, $file_path );
+      $artwork_id, $url, $referer, $order, $file_path );
     $order = $order + 1; // ページ番号をインクリメント
   }
 
@@ -343,10 +347,10 @@ function HtmlParse( $html, $q ){
 
   $dom = new DOMDocument;
   $dom->preserveWhiteSpace = false;
-  @$dom->loadHTML($html);
-  $xp = new DOMXPath($dom);
-
-  return $xp->query( $q );
+  @$dom->loadHTML( $html );
+  $xp = new DOMXPath( $dom );
+  $res = $xp->query( $q );
+  return $res;
 }
 
 function Curl( $url, $log_file_name, $referer ){

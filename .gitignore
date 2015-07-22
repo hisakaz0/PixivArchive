@@ -4,5 +4,4 @@ tmp
 *.swp
 *.org
 images
-link
-
+.images
