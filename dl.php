@@ -6,8 +6,10 @@ require_once dirname(__file__) . '/src/CookieLogin.php';
 require_once dirname(__file__) . '/src/Csv.php';
 require_once dirname(__file__) . '/src/PixivArtWorkDownload.php';
 
-$cookie_file            = $argv[1]; // login.phpで作成したcookie_file
-$userlist_file          = $argv[2]; // imageをdlをするための設定ファイル群
+$cookie_file   = $argv[1]; // login.phpで作成したcookie_file
+$userlist_file = $argv[2]; // imageをdlをするための設定ファイル群
+
+
 
 // Error Caught / ハートキャッチプリキュア
 if ( $argv[2] == '' ){
@@ -26,8 +28,11 @@ if ( ! file_exists( $argv[2] ) ){
   exit( 1 );
 }
 
+$session_id    = `date +%s`; // セッションごとにlogフォルダを生成
+mkdir('log/'. $session_id, 0777, true );
+
 # クッキーの処理
-if ( CookieLogin( $cookie_file, 'log/cookie_login.html' ) ){
+if ( CookieLogin() ){
   fputs(STDERR, "Interrupt: the '$argv[0]' execution\n");
   exit( 1 );
 }

@@ -1,6 +1,7 @@
 <?php
 
-function PixivArtWorkDownload ( $userlist, $cookie_file ){
+
+function PixivArtWorkDownload ( $userlist ){
 
   $store_userlist = array();
 
@@ -11,9 +12,9 @@ function PixivArtWorkDownload ( $userlist, $cookie_file ){
     $last_artwork_id = $user['last_artwork_id'];
 
     if ( $user['display_name'] == '' ){ //ディスプレイネームが設定されていない
-      list( $user_exist, $display_name ) = UserCheck( $user_id, $cookie_file );
+      list( $user_exist, $display_name ) = UserCheck( $user_id );
     } else { // されている
-      list( $user_exist, $display_name ) = UserCheck( $user_id, $cookie_file );
+      list( $user_exist, $display_name ) = UserCheck( $user_id );
       $display_name = $user['display_name'];
     }
 
@@ -26,15 +27,15 @@ function PixivArtWorkDownload ( $userlist, $cookie_file ){
             or die("Interrupt: Can't mkdir " . $dir ."'\n"); // 事故があったらえんだー
         }
         $page = 1; // 最新のページ
-        $current_artwork_id = GetFirstArtWorkId( $user_id, $page, $cookie_file ); //処女get
+        $current_artwork_id = GetFirstArtWorkId( $user_id, $page ); //処女get
         DownloadArtWork( // 先頭の作品をdl
-          $current_artwork_id, $user_id, $cookie_file );
+          $current_artwork_id, $user_id );
       } else {
         $current_artwork_id = $last_artwork_id; // 注目している作品
       }
 
       $last_artwork_id = AllDownloadArtWork(
-        $current_artwork_id, $user_id, $cookie_file ); // 最新の作品までdonwnload
+        $current_artwork_id, $user_id ); // 最新の作品までdonwnload
 
       $user = array( // last_artwork_idを更新する.
         $user_id, $last_artwork_id, $display_name );
@@ -45,39 +46,18 @@ function PixivArtWorkDownload ( $userlist, $cookie_file ){
   return $store_userlist;
 }
 
-function UserCheck( $user_id, $cookie_file ){
+function UserCheck( $user_id ){
 
   $url = 'http://www.pixiv.net/member.php?id=' . $user_id;
-  $dump_file = 'log/user_check_' . $user_id . '.log';
-  $html_file = 'log/user_check_' . $user_id . '.html';
+  $log_file_name = 'user_check_' . $user_id ;
 
-  $ch = curl_init($url); // curlの初期設定
-  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
-  curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を保存する
-  curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
-  $html = curl_exec($ch);
-  $info = curl_getinfo($ch); // 実行結果
-  curl_close($ch); // curl終了
-  $res = print_r($info, true);
-
-  $handle = fopen($html_file, 'w'); // dump html source
-  fputs( $handle, $html);
-  fclose($handle);
-
-  $handle = fopen($dump_file, 'w'); // dump curl log
-  fputs( $handle, $res );
-  fclose($handle);
+  list( $html, $info ) = Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  HtmlDump( $html, $log_file_name );
 
   if ( $info['http_code'] != '404' ){ // ユーザが存在するかどうか
 
-    $dom = new DOMDocument;
-    $dom->preserveWhiteSpace = false;
-    @$dom->loadHTML($html);
-    $xp = new DOMXPath($dom);
-
     $q = '//a[ @class = "user-link" ]/h1[ @class = "user" ]';
-    $res = $xp->query( $q );
+    $res = HtmlParse( $html, $q );
 
     if ( $res->length == 1 ){
       foreach ( $res as $node ){
@@ -88,19 +68,20 @@ function UserCheck( $user_id, $cookie_file ){
     fputs( STDERR, "Succeed: user_id '$user_id' / display_name '$display_name' is exist!.\n"); //いた
     fputs( STDERR, "Start: Download artworks of user_id '$user_id'.\n"); //いた
     return array( 0, $display_name );
+
   } else { // ユーザが存在しない
     fputs( STDERR, "Error: user_id '$user_id' is not exsit!\n"); // そんなユーザいねぇ
     return array( 1, '' );
   }
 }
 
-function AllDownloadArtWork( $current_artwork_id, $user_id, $cookie_file ){
+function AllDownloadArtWork( $current_artwork_id, $user_id ){
 
   while( true ){
     //  次の作品のidを拾ってくる ない場合は今見ている作品のid
-    $next_artwork_id = NextArtworkExist( $current_artwork_id, $cookie_file );
+    $next_artwork_id = NextArtworkExist( $current_artwork_id );
     if ( $next_artwork_id != $current_artwork_id ){ // 次の作品があるとき
-      DownloadArtWork( $next_artwork_id, $user_id, $cookie_file );
+      DownloadArtWork( $next_artwork_id, $user_id );
       $current_artwork_id = $next_artwork_id; // 注目点を次に移す
     } else { // 次の作品が無いとき
       return $current_artwork_id; // 現在のartwork_idを返却
@@ -108,50 +89,29 @@ function AllDownloadArtWork( $current_artwork_id, $user_id, $cookie_file ){
   }
 }
 
-function GetFirstArtWorkId( $user_id, $page, $cookie_file ){
+function GetFirstArtWorkId( $user_id, $page ){
 
   while ( true ){
 
     $url = 'http://www.pixiv.net/member_illust.php?' // urlの設定
       . 'id=' . $user_id . '&type=all' . '&p=' . $page;
+    $log_file_name = 'first_artwork_id_' . $user_id;
 
-    $dump_file = 'log/first_artwork_id' . $user_id . '.log';
-    $html_file = 'log/first_artwork_id' . $user_id . '.html';
+    list( $html, $info )= Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+    HtmlDump( $html, $log_file_name );
 
-    $ch = curl_init($url); // curlの初期設定
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
-    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を保存する
-    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
-    $html = curl_exec($ch);
-    $info = curl_getinfo($ch); // 実行結果
-    curl_close($ch); // curl終了
-    $res = print_r($info, true);
+    $q = '//a[ @class = "user-link" ]/h1[ @class = "user" ]';
+    $res = HtmlParse( $html, $q );
 
-    $handle = fopen($html_file, 'w'); // dump html source
-    fputs( $handle, $html);
-    fclose($handle);
-
-    $handle = fopen($dump_file, 'w'); // dump curl log
-    fputs( $handle, $res );
-    fclose($handle);
-
-    $dom = new DOMDocument; // dom解析の初期設定
-    $dom->preserveWhiteSpace = false;
-    @$dom->loadHTML($html);
-    $xp = new DOMXPath($dom);
-
-    $q = '//div[ @class = "pager-container" ]/span[ @class = "next" ]/a';
-    $res = $xp->query( $q );
     if ( $res->length != 0 ){ // 次のページがある場合
       $q = '//ul[ @class = "page-list" ]/li[last()]/a'; // 辿れる最後のページを取得
-      $res = $xp->query( $q );
+      $res = HtmlParse( $html, $q );
       foreach ( $res as $node ){
         $page = $node->textContent; // page番号を取得
       }
     } else { //次のページがない場合. つまり,最後のページの場合
       $q = '//ul[ @class = "_image-items" ]/li[ last() ]/a[ @class ]'; // 最後の作品をGet
-      $res = $xp->query( $q );
+      $res = HtmlParse( $html, $q );
       foreach( $res as $node ){
         $matchs = array(); //マッチした全体は0,あとは括弧の数だけ要素が増えていく
         preg_match( '/illust_id=(\d+)/', $node->getAttribute("href"), $matchs );
@@ -162,42 +122,20 @@ function GetFirstArtWorkId( $user_id, $page, $cookie_file ){
   }
 }
 
-function DownloadArtWork( $artwork_id, $user_id, $cookie_file ){
+function DownloadArtWork( $artwork_id, $user_id ){
 
   $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
+  $log_file_name = 'download_artwork_' . $artwork_id;
 
-  $dump_file = 'log/download_artwork_' . $artwork_id . '.log';
-  $html_file = 'log/download_artwork_' . $artwork_id . '.html';
-
-  $ch = curl_init($url); // curlの初期設定
-  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
-  curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を読み込む
-  curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
-  $html = curl_exec($ch);
-  $info = curl_getinfo($ch); // 実行結果
-  curl_close($ch); // curl終了
-  $res = print_r($info, true);
-
-  $handle = fopen($html_file, 'w'); // dump html source
-  fputs( $handle, $html);
-  fclose( $handle );
-
-  $handle = fopen($dump_file, 'w'); // dump curl log
-  fputs( $handle, $res );
-  fclose( $handle );
+  list( $html, $info )= Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  HtmlDump( $html, $log_file_name );
 
   fputs( STDERR, "Start: Download a artwork with artwork_id '" . $artwork_id . "'.\n" );
-
-  $dom = new DOMDocument;
-  $dom->preserveWhiteSpace = false;
-  @$dom->loadHTML($html);
-  $xp = new DOMXPath($dom);
 
 
   // 日時データを取得
   $q = '//ul[ @class = "meta" ]/li[1]';
-  $res = $xp->query( $q );
+  $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
     foreach ( $res as $node ){ // なんちゃって1つだけ
       $date = $node->textContent; // 最終的なmetaは$dateです.
@@ -211,7 +149,7 @@ function DownloadArtWork( $artwork_id, $user_id, $cookie_file ){
 
   // タイトル回収
   $q = '//div[ @class = "ui-expander-target" ]/h1'; // 1つめの
-  $res = $xp->query( $q );
+  $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
     foreach ( $res as $node ){ // なんちゃって1つだけ
       $title = $node->textContent; // 最終的なmetaは$dateです.
@@ -219,7 +157,7 @@ function DownloadArtWork( $artwork_id, $user_id, $cookie_file ){
   }
 
   $q = '//section[ @class = "work-info" ]/h1'; // 2つめの
-  $res = $xp->query( $q );
+  $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
     foreach ( $res as $node ){ // なんちゃって1つだけ
       $title = $node->textContent; // 最終的なmetaは$dateです.
@@ -238,7 +176,7 @@ function DownloadArtWork( $artwork_id, $user_id, $cookie_file ){
 
   // イラストか判定 イラストだったらdlしてreturn 0
   $q = '//div/div[ @class = "wrapper" ]/img'; // original url先を取得
-  $res = $xp->query( $q );
+  $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
     fputs( STDERR, "Mode is illust.\n" );
     $referer = $url; // refererのせってい
@@ -250,16 +188,16 @@ function DownloadArtWork( $artwork_id, $user_id, $cookie_file ){
     $suffix = $matchs[1];
     $file_path = 'images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
     $order = '';
-    DownloadImage( $artwork_id, $img_url, $referer, $order, $file_path, $cookie_file );
+    DownloadContent( $artwork_id, $img_url, $referer, $order, $file_path );
     return 0;
   }
 
 
   // マンガ検索 マンガだったらかDownloadMangaを行って return 0
   $q = '//div[ @class = "works_display" ]/a';
-  $res = $xp->query( $q );
+  $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
-    DownloadManga( $artwork_id, $user_id, $artwork_stored_name, $cookie_file );
+    DownloadManga( $artwork_id, $user_id, $artwork_stored_name );
     return 0;
   }
 
@@ -276,8 +214,8 @@ function DownloadArtWork( $artwork_id, $user_id, $cookie_file ){
     $file_path =  $dir_path . '/ugoira.zip';
     mkdir( $dir_path, 0777, true ) //フォルダ作成
       or die("Interrupt: Can't mkdir ". $dir_path ."'\n");
-    DownloadImage(
-      $artwork_id, $ugoira_url, $referer, $order, $file_path, $cookie_file );
+    DownloadContent(
+      $artwork_id, $ugoira_url, $referer, $order, $file_path );
     $zip = new ZipArchive;
     if ( $zip->open( $file_path ) === TRUE ) { // ファイルオープンが成功
       $zip->extractTo( $dir_path ); // 解凍先
@@ -297,33 +235,17 @@ function DownloadArtWork( $artwork_id, $user_id, $cookie_file ){
   return 1;
 }
 
-function DownloadImage(
-  $artwork_id, $image_url, $referer, $order, $file_path, $cookie_file ){
+function DownloadContent(
+  $artwork_id, $url, $referer, $order, $file_path ){
 
   if ( $order == '' ){
-    $dump_file = 'log/download_image_' . $artwork_id . '.log';
+    $log_file_name = 'download_image_' . $artwork_id;
   } else {
-    $dump_file = 'log/download_image_' . $artwork_id . '_' . $order . '.log';
+    $log_file_name = 'download_image_' . $artwork_id . '_' . $order;
   }
 
-  $ch = curl_init($image_url); // curlの初期設定
-  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
-  curl_setopt($ch, CURLOPT_REFERER, $referer); // refererを設定
-  curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を読み込む
-  curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
-  $img = curl_exec($ch);
-  $info = curl_getinfo($ch); // 実行結果
-  curl_close($ch); // curl終了
-  $res = print_r($info, true);
-
-  $handle = fopen($dump_file, 'w'); // dump curl log
-  fputs( $handle, $res );
-  fclose( $handle );
-
-  $handle = fopen($file_path, 'w'); // dump html source
-  fputs( $handle, $img);
-  fclose( $handle );
+  list( $html, $info ) =
+    Curl( $url, $log_file_name, $referer ); // urlからcontentを引っ張ってくる
 
   if ( $info['http_code'] == 200 ){
     fputs( STDERR,
@@ -334,43 +256,19 @@ function DownloadImage(
       "Error: failed a download image with artwork_id " . $artwork_id . "\n" );
     return 1;
   }
-
 }
 
-function DownloadManga( $artwork_id, $user_id, $artwork_stored_name, $cookie_file ){
+function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
 
   fputs( STDERR, "Mode is mange.\n" );
   $url = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id;
 
-  $dump_file = 'log/download_manga' . $artwork_id . '.log';
-  $html_file = 'log/download_manga' . $artwork_id . '.html';
-
-  $ch = curl_init($url); // curlの初期設定
-  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
-  curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を読み込む
-  curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
-  $html = curl_exec($ch);
-  $info = curl_getinfo($ch); // 実行結果
-  curl_close($ch); // curl終了
-  $res = print_r($info, true);
-
-  $handle = fopen($html_file, 'w'); // dump html source
-  fputs( $handle, $html);
-  fclose( $handle );
-
-  $handle = fopen($dump_file, 'w'); // dump curl log
-  fputs( $handle, $res );
-  fclose( $handle );
-
-  $dom = new DOMDocument;
-  $dom->preserveWhiteSpace = false;
-  @$dom->loadHTML($html);
-  $xp = new DOMXPath($dom);
+  list( $html, $info ) = Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  HtmlDump( $html, $log_file_name );
 
   // 日時データを取得
   $q = '//section/div[ @class = "item-container" ]/img';
-  $res = $xp->query( $q );
+  $res = HtmlParse( $html, $q );
   $order = 0; // マンガのページ番号
   $referer = $url; // refererの設定
 
@@ -382,18 +280,18 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name, $cookie_fil
 
   foreach ( $res as $node ){
 
-    $img_url = $node->getAttribute('data-src'); // srcはクリックしないと表示されない
+    $url = $node->getAttribute('data-src'); // srcはクリックしないと表示されない
 
     $matchs = array();
-    preg_match( '/\.(\w+)$/', $img_url, $matchs ); // 拡張子取り出し
+    preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
     $suffix = $matchs[1];
 
     $file_path = sprintf( // ファイルパス
       'images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
       $user_id, $artwork_stored_name, $order, $suffix);
 
-    DownloadImage( // 各画像をダウンロード
-      $artwork_id, $img_url, $referer, $order, $file_path, $cookie_file );
+    DownloadContent( // 各画像をダウンロード
+      $artwork_id, $img_url, $referer, $order, $file_path );
     $order = $order + 1; // ページ番号をインクリメント
   }
 
@@ -403,36 +301,13 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name, $cookie_fil
 function NextArtworkExist( $artwork_id, $cookie_file ){
 
   $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
+  $log_file_name = 'next_artwork_id_' . $artwork_id;
 
-  $dump_file = 'log/next_artwork_id_' . $artwork_id . '.log';
-  $html_file = 'log/next_artwork_id_' . $artwork_id . '.html';
-
-  $ch = curl_init($url); // curlの初期設定
-  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // redirectionを有効化
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // プレーンテキストで出力
-  curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を読み込む
-  curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file); // cookie情報を保存する
-  $html = curl_exec($ch);
-  $info = curl_getinfo($ch); // 実行結果
-  curl_close($ch); // curl終了
-  $res = print_r($info, true);
-
-  $handle = fopen($html_file, 'w'); // dump html source
-  fputs( $handle, $html);
-  fclose( $handle );
-
-  $handle = fopen($dump_file, 'w'); // dump curl log
-  fputs( $handle, $res );
-  fclose( $handle );
-
-  $dom = new DOMDocument;
-  $dom->preserveWhiteSpace = false;
-  @$dom->loadHTML($html);
-  $xp = new DOMXPath($dom);
+  list( $html, $info ) = Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  HtmlDump( $html, $log_file_name );
 
   $q = '//ul/li[ @class = "before" ]/a'; // 次の作品
-  $res = $xp->query( $q );
-
+  $res = HtmlParse( $html, $q );
 
   if ( $res->length == 1 ){ // 次のページがあるとき
     foreach( $res as $node ){
@@ -447,4 +322,51 @@ function NextArtworkExist( $artwork_id, $cookie_file ){
   }
 }
 
+
+function HtmlDump( $html, $log_file_name ){
+
+  global $session_id;
+
+  $handle = fopen( 'log/' . $session_id . '/' . $log_file_name .'.html', 'w' );
+  fputs( $handle, $html );
+  fclose( $handle );
+}
+
+function HtmlParse( $html, $q ){
+
+  $dom = new DOMDocument;
+  $dom->preserveWhiteSpace = false;
+  @$dom->loadHTML($html);
+  $xp = new DOMXPath($dom);
+
+  return $xp->query( $q );
+}
+
+function Curl( $url, $log_file_name, $referer ){
+
+  global $session_id, $cookie_file;
+  $dump_file = 'log/' . $session_id . '/' . $log_file_name . '.log' ;
+
+  $ch = curl_init( $url ); // curlの初期設定
+  curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, true ); // redirectionを有効化
+  curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true ); // プレーンテキストで出力
+  curl_setopt( $ch, CURLOPT_COOKIEJAR, $cookie_file ); // cookie情報を読み込む
+  curl_setopt( $ch, CURLOPT_COOKIEFILE, $cookie_file ); // cookie情報を保存する
+
+  if ( $referer != '' ){ // refererがあれば
+    curl_setopt( $ch, CURLOPT_REFERER, $referer ); // refererを設定
+  }
+
+  $content = curl_exec( $ch ); // curlの実行
+
+  $info = curl_getinfo( $ch ); // 実行結果
+  curl_close( $ch ); // curl終了
+  $info = print_r( $info, true );
+
+  $handle = fopen( $log_file, 'w' ); //write curl log
+  fputs( $handle, $res );
+  fclose( $handle );
+
+  return array( $content, $info );
+}
 ?>
