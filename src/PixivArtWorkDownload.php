@@ -21,7 +21,7 @@ function PixivArtWorkDownload ( $userlist ){
     if ( $user_exist == 0 ){ // user exsit
 
       if ( $last_artwork_id == '' ){ // last_artwork_idがnull 初めてのご利用
-        $dir = 'images/' . $user_id; // ユーザのディレクトリ
+        $dir = '.images/' . $user_id; // ユーザのディレクトリ
         if ( ! file_exists( $dir ) ){ // フォルダが作られているか
           mkdir( $dir, 0777, true ) // なかったら作る
             or die("Interrupt: Can't mkdir " . $dir ."'\n"); // 事故があったらえんだー
@@ -194,7 +194,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
       preg_match( '/\.(\w+)$/', $img_url, $matchs ); // 拡張子取り出し
     }
     $suffix = $matchs[1];
-    $file_path = 'images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
+    $file_path = '.images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
     $order = '';
     DownloadContent( $artwork_id, $img_url, $referer, $order, $file_path );
     return 0;
@@ -219,7 +219,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
     $referer = $url;
     $ugoira_url = preg_replace( '/\\\\/', '', $matchs[1] ); // うごいらのzip のurl
     $order = ''; // うごいらに順番なんてない
-    $dir_path  = 'images/' . $user_id. '/' . $artwork_stored_name;
+    $dir_path  = '.images/' . $user_id. '/' . $artwork_stored_name;
     $file_path =  $dir_path . '/ugoira.zip';
     mkdir( $dir_path, 0777, true ) //フォルダ作成
       or die("Interrupt: Can't mkdir ". $dir_path ."'\n");
@@ -282,7 +282,7 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
   $referer = $url; // refererの設定
 
 
-  $dir = 'images/'. $user_id. '/' . $artwork_stored_name;
+  $dir = '.images/'. $user_id. '/' . $artwork_stored_name;
   if ( ! file_exists( $dir ) ){ // ファイルが存在するか
     mkdir( $dir, 0777, true ) or die("Interrupt: Can't mkdir ". $dir ."'\n");
   }
@@ -295,7 +295,7 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
     $suffix = $matchs[1];
 
     $file_path = sprintf( // ファイルパス
-      'images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
+      '.images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
       $user_id, $artwork_stored_name, $order, $suffix);
 
     DownloadContent( // 各画像をダウンロード

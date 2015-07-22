@@ -30,6 +30,11 @@ date_default_timezone_set( 'Asia/Tokyo' );
 $session_id = date( 'ymdHis' );
 mkdir( 'log/dl/' . $session_id, 0777, true );
 
+if ( ! file_exists( '.images' ) ){ // フォルダが作られているか
+  mkdir( '.images', 0777, true );
+}
+
+
 # クッキーの処理
 if ( CookieLogin( ) ){
   fputs(STDERR, "Interrupt: the '$argv[0]' execution\n");
