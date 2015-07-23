@@ -19,15 +19,15 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
 
     if ( $user_exist == 0 ){ // user exsit
       if ( $last_artwork_id == '' ){ // last_artwork_idがnull 初めてのご利用
-
-        if ( ! MakeDirectory( '.images/' . $user_id ) ) { // ユーザのディレクトリ作成
+        $dir = '.images/' . $user_id;
+        if ( ! MakeDirectory( $dir ) ) { // ユーザのディレクトリ作成
           $current_artwork_id = 1; // 空に設定 条件フラグの役割
           Msg('error', "failed make directory in $dir.\n"); // 作れなかった報告
-          break 2; # dlしない
-        }
-        $current_artwork_id = GetFirstArtWorkId( $user_id, 1 ); //処女get
-        if ( $current_artwork_id != 1 ){ // 失敗したらオシマイ
-          DownloadArtWork( $current_artwork_id, $user_id ); // 先頭の作品をdl
+        } else { 
+          $current_artwork_id = GetFirstArtWorkId( $user_id, 1 ); //処女get
+          if ( $current_artwork_id != 1 ){ // 失敗したらオシマイ
+            DownloadArtWork( $current_artwork_id, $user_id ); // 先頭の作品をdl
+          }
         }
       } else {
         $current_artwork_id = $last_artwork_id; // またのご来店
@@ -228,25 +228,25 @@ function DownloadArtWork( $artwork_id, $user_id ){
     $referer = $url;
     $url = preg_replace( '/\\\\/', '', $matchs[1] ); // うごいらのzip のurl
     $order = ''; // うごいらに順番なんてない
-    $dir_path  = '.images/' . $user_id. '/' . $artwork_stored_name;
-    $file_path =  $dir_path . '/ugoira.zip';
+    $dir  = '.images/' . $user_id. '/' . $artwork_stored_name;
+    $file =  $dir . '/ugoira.zip';
 
-    if ( MakeDirectory( $dir_path ) ){
-      Msg( "error", "Couldn't make the directory " . $dir_path . "'\n" );
+    if ( ! MakeDirectory( $dir ) ){
+      Msg( "error", "Couldn't make the directory " . $dir . "'\n" );
       return 1;
     }
 
     DownloadContent(
-      $artwork_id, $url, $referer, $order, $file_path );
+      $artwork_id, $url, $referer, $order, $file );
     $zip = new ZipArchive;
-    if ( $zip->open( $file_path ) === TRUE ) { // ファイルオープンが成功
-      $zip->extractTo( $dir_path ); // 解凍先
+    if ( $zip->open( $file ) === TRUE ) { // ファイルオープンが成功
+      $zip->extractTo( $dir ); // 解凍先
       $zip->close();
-      Msg( "succeed", "Extract a zip file '$file_path'\n\tto '$dir_path'.\n" );
-      unlink( $file_path ); // ファイル削除
-      Msg( "succeed", "Remove a zip file '$file_path'.\n" );
+      Msg( "succeed", "Extract a zip file '$file'\n\tto '$dir'.\n" );
+      unlink( $file ); // ファイル削除
+      Msg( "succeed", "Remove a zip file '$file'.\n" );
     } else {
-      Msg( "error", "Couldn't remove a zip file '$file_path'.\n" );
+      Msg( "error", "Couldn't remove a zip file '$file'.\n" );
     }
 
     return 0;
@@ -293,8 +293,8 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
   list( $html, $info ) = @Curl( $url, $log_file_name, $referer );
 
   $dir = '.images/'. $user_id. '/' . $artwork_stored_name;
-  if ( MakeDirectory( $dir ) ){
-    Msg( "error", "Couldn't make the directory " . $dir_path . "'\n" );
+  if ( ! MakeDirectory( $dir ) ){
+    Msg( "error", "Couldn't make the directory " . $dir . "'\n" );
     return 1;
   }
 
@@ -407,11 +407,11 @@ function MakeDirectory( $dir ){
 
   if ( ! is_dir( $dir ) ){ // ディレクトリがあるか?
     if ( ! mkdir( $dir, 0777, true ) ) { // なければ作る
-      return 1; // 作れませんでした.
+      return false; // 作れませんでした.
     }
   }
 
-  return 0; //作れました. or ありました.
+  return true; //作れました. or ありました.
 
 }
 
