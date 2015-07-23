@@ -37,7 +37,7 @@ do
   ID=`echo $ROW | cut -d ',' -f1`
   NAME=`echo $ROW | cut -d ',' -f3`
   if [ -n $NAME ]; then
-    ln -f "$IMAGE_DIR_ABS/$ID" "$LINK_DIR/$NAME"
+    ln -sf "$IMAGE_DIR_ABS/$ID" "$LINK_DIR/$NAME"
     echo ln -sf "$IMAGE_DIR_ABS/$ID" "$LINK_DIR/$NAME"
   fi
 done
