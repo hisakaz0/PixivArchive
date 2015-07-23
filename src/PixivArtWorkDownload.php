@@ -128,6 +128,7 @@ function GetFirstArtWorkId( $user_id, $page ){
         Msg( "succeed", "Get a first artwork with user_id '" . $user_id . "' .\n" );
         return $matchs[1]; // 作品のidだけ返す
       } else { // なんかおかしい場合
+        CurlDump( $info, $log_file_name );
         Msg( "error", "failed get a first artwork with user_id '" . $user_id . "' .\n" );
         return 1;
       }
@@ -251,12 +252,12 @@ function DownloadArtWork( $artwork_id, $user_id ){
     return 0;
   }
 
+  CurlDump( $info, $log_file_name );
   Msg( "error", "Couldn't  download the artwork with artwork_id '" . $artwork_id . "'\n" );
   return 1;
 }
 
-function DownloadContent(
-  $artwork_id, $url, $referer, $order, $file_path ){
+function DownloadContent( $artwork_id, $url, $referer, $order, $file_path ){
 
   if ( $order == '' ){
     $log_file_name = 'download_image_' . $artwork_id;
@@ -320,6 +321,7 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
     }
     return 0;
   } else {
+    CurlDump( $info, $log_file_name );
     Msg( "error", "Couldn't donwnload the manga with artwork_id " . $artwork_id. "'\n" );
     return 1;
   }
