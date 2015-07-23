@@ -22,11 +22,11 @@ function ReadCsv ( $file ){
     // Error Cacht
     if ( empty( $user_id ) != true ){  // 空じゃないとき
       if ( @preg_grep( '/^\d+$/', $user_id ) ){ // user_idは数字だけのときだけ許す
-        fputs(STDERR, "Error: user_id is only digit.\n");
+        Msg( "error", "user_id is only digit.\n");
         exit( 1 );
       }
       if ( @preg_grep( '/^\d+$/', $last_artwork_id ) ){ // last_artwork_idは数字だけ
-        fputs(STDERR, "Error: last_artwork_id is only digit.\n");
+        Msg( "error", "last_artwork_id is only digit.\n");
         exit( 1 );
       }
 
@@ -39,7 +39,7 @@ function ReadCsv ( $file ){
     } // 先頭が空の時は無視する
   }
 
-  fputs( STDERR, "Succeed: Read csv file '" . $file. "'.\n" );
+  Msg( 'succeed' , "Read csv file '" . $file. "'.\n" );
   return( $userlist );
 
 }
@@ -58,6 +58,6 @@ function WriteCsv ( $userlist, $userlist_file ){
 
   fclose( $handle );
 
-  fputs( STDERR, "Write: updated userlist\n" );
+  Msg( 0, "Write: updated userlist\n" );
   return 0;
 }

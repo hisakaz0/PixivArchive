@@ -12,12 +12,11 @@ function CookieLogin (){ // cookie_fileでログインできるか?
   HtmlDump( $html, $log_file_name );
 
   if ( $info['url'] == 'http://www.pixiv.net/' ){ // 成功
-    fputs( STDERR, "Your login is successful!\n" );
+    Msg( 0, "Your login is successful!\n" );
     return 0;
   }else{ // 失敗
-    fputs( STDERR, "Faile: your login...\n" );
-    fputs( STDERR,
-      "Please pass a login with 'login.php' before execution $argv[0].\n" );
+    Msg( 0, "Your login...\n", 'error' );
+    Msg( 0, "Please pass a login with 'login.php' before execution $argv[0].\n" );
     return 1;
   }
 }

@@ -1,12 +1,11 @@
 <?php
 
-
 function PixivArtWorkDownload ( $userlist, $userlist_file ){
 
   for ( $i = 0; $i < count( $userlist ); $i++ ){ // 一つ一つ取り出し
 
     // ユーザ情報を user_id, last_artwork_id, display_nameに分解
-     $user_id         = $userlist[$i]['user_id'];
+    $user_id         = $userlist[$i]['user_id'];
     @$last_artwork_id = $userlist[$i]['last_artwork_id'];
     @$display_name    = $userlist[$i]['display_name'];
 
@@ -63,16 +62,13 @@ function UserCheck( $user_id ){
       }
     }
 
-    fputs( STDERR,
-      "Succeed: user_id '$user_id' / display_name '$display_name' is exist!.\n"); //いた
-    fputs( STDERR,
-      "Start: Download artworks of user_id '$user_id'.\n"); //いた
-
+    Msg( "succeed", "user_id '$user_id' / display_name '$display_name' is exist!.\n" );
+    Msg( "started", "Download artworks of user_id '$user_id'.\n" ); //いた
     return array( 0, $display_name );
 
   } else { // ユーザが存在しない
 
-    fputs( STDERR, "Error: user_id '$user_id' is not exsit!\n"); // そんなユーザいねぇ
+    Msg( "error", "user_id '$user_id' is not exsit!\n" ); // そんなユーザいねぇ
     return array( 1, '' );
 
   }
@@ -119,7 +115,7 @@ function GetFirstArtWorkId( $user_id, $page ){
         preg_match( '/illust_id=(\d+)/', $node->getAttribute("href"), $matchs );
       }
 
-      fputs( STDERR, "Succeed: Get a first artwork with user_id '" . $user_id . "' .\n" );
+      Msg( "succeed", "Get a first artwork with user_id '" . $user_id . "' .\n" );
       return $matchs[1]; // 作品のidだけ返す
     }
   }
@@ -133,7 +129,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
   list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
   HtmlDump( $html, $log_file_name );
 
-  fputs( STDERR, "Start: Download a artwork with artwork_id '" . $artwork_id . "'.\n" );
+  Msg( "started", "Download a artwork with artwork_id '" . $artwork_id . "'.\n" );
 
 
   // 日時データを取得
@@ -148,7 +144,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
         $matchs[0][0], $matchs[0][1], $matchs[0][2], $matchs[0][3], $matchs[0][4] );
     }
   } else {
-    fputs( STDERR, "Error Couldn't get artwork uploaded date.\n" );
+    Msg( "error", "Couldn't get artwork uploaded date.\n" );
   }
 
 
@@ -170,7 +166,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
   }
 
   if ( $title == '' ){ //タイトルないとの報告
-    fputs( STDERR, "Error Couldn't get artwork title.\n" );
+    Msg( "error", "Couldn't get artwork title.\n" );
   } else { // ファイル名に使えない文字を置換
     $title = preg_replace( '/(\\\|\/)/', '_', $title ); // スラ系はアンダーバーに変換
   }
@@ -183,7 +179,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
   $q = '//div/div[ @class = "wrapper" ]/img'; // original url先を取得
   $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
-    fputs( STDERR, "Mode is illust.\n" );
+    Msg( 0, "Mode is illust.\n" );
     $referer = $url; // refererのせってい
     foreach ( $res as $node ){
       $url = $node->getAttribute('data-src'); // srcはクリックしないと表示されない
@@ -202,17 +198,18 @@ function DownloadArtWork( $artwork_id, $user_id ){
   $q = '//div[ @class = "works_display" ]/a';
   $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
-    fputs( STDERR, "Mode is mange.\n" );
+    Msg( 0, "Mode is mange.\n" );
     DownloadManga( $artwork_id, $user_id, $artwork_stored_name );
     return 0;
   }
 
   // うごいら判定 うごいらだったらDwonloadUgoiraを行って return 0
   $matchs = array();
-  $pattern = '/pixiv\.context\.ugokuIllustFullscreenData\s*=\s*{"?src"?:"?([\/\\\\\-:\.\w]+)"?,/';
+  $pattern =
+    '/pixiv\.context\.ugokuIllustFullscreenData\s*=\s*{"?src"?:"?([\/\\\\\-:\.\w]+)"?,/';
   preg_match( $pattern, $html , $matchs );
   if ( $matchs[1] != '' ){ // urlが獲得できたとき
-    fputs( STDERR, "Mode is ugoira.\n" );
+    Msg( 0, "Mode is ugoira.\n" );
     $referer = $url;
     $url = preg_replace( '/\\\\/', '', $matchs[1] ); // うごいらのzip のurl
     $order = ''; // うごいらに順番なんてない
@@ -228,18 +225,16 @@ function DownloadArtWork( $artwork_id, $user_id ){
     if ( $zip->open( $file_path ) === TRUE ) { // ファイルオープンが成功
       $zip->extractTo( $dir_path ); // 解凍先
       $zip->close();
-      fputs( STDERR, "Succeed: Extract a zip file '$file_path'\n\tto '$dir_path'.\n" );
+      Msg( "succeed", "Extract a zip file '$file_path'\n\tto '$dir_path'.\n" );
       unlink( $file_path );
-      fputs( STDERR, "Succeed: Remove a zip file '$file_path'.\n" );
+      Msg( "succeed", "Remove a zip file '$file_path'.\n" );
     } else {
-      fputs( STDERR, "Error: Couldn't remove a zip file '$file_path'.\n" );
+      Msg( "error", "Couldn't remove a zip file '$file_path'.\n" );
     }
     return 0;
   }
 
-
-  fputs( STDERR,
-    "Error: cannot download the artwork with artwork_id '" . $artwork_id . "'\n" );
+  Msg( "error", "cannot download the artwork with artwork_id '" . $artwork_id . "'\n" );
   return 1;
 }
 
@@ -261,12 +256,11 @@ function DownloadContent(
     fputs( $handle, $html );
     fclose( $handle );
 
-    fputs( STDERR, "Succeed: Downloaded a image in $file_path\n" );
+    Msg( "succeed", "Downloaded a image in $file_path\n" );
     return 0;
 
   } else {
-    fputs( STDERR,
-      "Error: failed a download image with artwork_id " . $artwork_id . "\n" );
+    Msg( "error", "failed a download image with artwork_id " . $artwork_id . "\n" );
     return 1;
   }
 }
@@ -328,7 +322,7 @@ function NextArtWorkExist( $artwork_id ){
     }
     return $next_artwork_id;
   } else { // 次のページがないとき
-    fputs( STDERR, "This artwork_id '" . $artwork_id . "' is the latest.\n" );
+    Msg( 0, "This artwork_id '" . $artwork_id . "' is the latest.\n" );
     return $artwork_id; // 同じartwork_idを返す
   }
 }
