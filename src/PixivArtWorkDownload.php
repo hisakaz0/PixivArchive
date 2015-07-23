@@ -21,19 +21,31 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
       if ( $last_artwork_id == '' ){ // last_artwork_idがnull 初めてのご利用
         $dir = '.images/' . $user_id; // ユーザのディレクトリ
         if ( ! file_exists( $dir ) ){ // フォルダが作られているか
-          mkdir( $dir, 0777, true ) // なかったら作る
-            or die("Interrupt: Can't mkdir " . $dir ."'\n"); // 事故があったらえんだー
+          if ( mkdir( $dir, 0777, true ) ) {   // なかったら作る
+            $current_artwork_id = 1; // 空に設定 条件フラグの役割
+            Msg('error', "failed make directory in $dir.\n"); // 作れなかった報告
+            break 3; # dl市内
+          }
         }
+
         $page = 1; // 最新のページ
         $current_artwork_id = GetFirstArtWorkId( $user_id, $page ); //処女get
-        DownloadArtWork( // 先頭の作品をdl
-          $current_artwork_id, $user_id );
+
+        if ( $current_artwork_id != 1 ){ // 失敗したらオシマイ
+          DownloadArtWork( $current_artwork_id, $user_id ); // 先頭の作品をdl
+        }
+
       } else {
         $current_artwork_id = $last_artwork_id; // 注目している作品
       }
 
-      $last_artwork_id = AllDownloadArtWork(
-        $current_artwork_id, $user_id ); // 最新の作品までdonwnload
+      if ( $current_artwork_id != 1 ){ // 失敗してなかったら
+        $last_artwork_id = AllDownloadArtWork(
+          $current_artwork_id, $user_id ); // 最新の作品までdonwnload
+      } else {
+        Msg('interrupt', "download artwork with user_id $user_id.\n"); //dlしないと報告
+        $last_artwork_id = ''; // 空に設定
+      }
 
       $userlist[$i]['last_artwork_id'] = $last_artwork_id;
       $userlist[$i]['display_name']    = $display_name;
@@ -49,7 +61,6 @@ function UserCheck( $user_id ){
   $log_file_name = 'user_check_' . $user_id ;
 
   list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
-  HtmlDump( $html, $log_file_name );
 
   if ( $info['http_code'] != '404' ){ // ユーザが存在するかどうか
 
@@ -97,7 +108,6 @@ function GetFirstArtWorkId( $user_id, $page ){
     $log_file_name = 'first_artwork_id_' . $user_id;
 
     list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
-    HtmlDump( $html, $log_file_name );
 
 
     $q = '//ul[ @class = "page-list" ]/li[last()]/a'; // 辿れる最後のページを取得
@@ -110,13 +120,18 @@ function GetFirstArtWorkId( $user_id, $page ){
     } else { //次のページがない場合. つまり,最後のページの場合
       $q = '//ul[ @class = "_image-items" ]/li[ last() ]/a[ @class ]'; // 最後の作品をGet
       $res = HtmlParse( $html, $q );
-      foreach( $res as $node ){
-        $matchs = array(); //マッチした全体は0,あとは括弧の数だけ要素が増えていく
-        preg_match( '/illust_id=(\d+)/', $node->getAttribute("href"), $matchs );
+      if ( $res->length == 1 ){
+        foreach( $res as $node ){
+          $matchs = array(); //マッチした全体は0,あとは括弧の数だけ要素が増えていく
+          preg_match( '/illust_id=(\d+)/', $node->getAttribute("href"), $matchs );
+        }
+        Msg( "succeed", "Get a first artwork with user_id '" . $user_id . "' .\n" );
+        return $matchs[1]; // 作品のidだけ返す
+      } else { // なんかおかしい場合
+        Msg( "error", "failed get a first artwork with user_id '" . $user_id . "' .\n" );
+        return 1;
       }
 
-      Msg( "succeed", "Get a first artwork with user_id '" . $user_id . "' .\n" );
-      return $matchs[1]; // 作品のidだけ返す
     }
   }
 }
@@ -127,7 +142,6 @@ function DownloadArtWork( $artwork_id, $user_id ){
   $log_file_name = 'download_artwork_' . $artwork_id;
 
   list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
-  HtmlDump( $html, $log_file_name );
 
   Msg( "started", "Download a artwork with artwork_id '" . $artwork_id . "'.\n" );
 
@@ -234,6 +248,8 @@ function DownloadArtWork( $artwork_id, $user_id ){
     return 0;
   }
 
+  HtmlDump( $html, $log_file_name );
+  CurlDump( $info, $log_file_name );
   Msg( "error", "cannot download the artwork with artwork_id '" . $artwork_id . "'\n" );
   return 1;
 }
@@ -260,6 +276,7 @@ function DownloadContent(
     return 0;
 
   } else {
+    CurlDump( $info, $log_file_name );
     Msg( "error", "failed a download image with artwork_id " . $artwork_id . "\n" );
     return 1;
   }
@@ -272,7 +289,6 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
   $log_file_name = 'donwnload_manga_' . $artwork_id;
 
   list( $html, $info ) = @Curl( $url, $log_file_name, $referer );
-  HtmlDump( $html, $log_file_name );
 
 
   $dir = '.images/'. $user_id. '/' . $artwork_stored_name;
@@ -309,7 +325,6 @@ function NextArtWorkExist( $artwork_id ){
   $log_file_name = 'next_artwork_id_' . $artwork_id;
 
   list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
-  HtmlDump( $html, $log_file_name );
 
   $q = '//ul/li[ @class = "before" ]/a'; // 次の作品
   $res = HtmlParse( $html, $q );
@@ -333,6 +348,17 @@ function HtmlDump( $html, $log_file_name ){
 
   $handle = fopen( 'log/dl/' . $session_id . '/' . $log_file_name .'.html', 'w' );
   fputs( $handle, $html );
+  fclose( $handle );
+}
+
+function CurlDump( $info, $log_file_name ){
+
+  global $session_id;
+
+  $info_text = print_r( $info, true );
+
+  $handle = fopen( 'log/dl/' . $session_id . '/' . $log_file_name .'.log', 'w' );
+  fputs( $handle, $info_text );
   fclose( $handle );
 }
 
@@ -365,11 +391,6 @@ function Curl( $url, $log_file_name, $referer ){
 
   $info = curl_getinfo( $ch ); // 実行結果
   curl_close( $ch ); // curl終了
-  $info_text = print_r( $info, true );
-
-  $handle = fopen( $log_file, 'w' ); //write curl log
-  fputs( $handle, $info_text );
-  fclose( $handle );
 
   return array( $content, $info );
 
