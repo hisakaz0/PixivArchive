@@ -2,18 +2,19 @@
 
 function PixivArtWorkDownload ( $userlist, $userlist_file ){
 
-  for ( $i = 0; $i < count( $userlist ); $i++ ){ // 一つ一つ取り出し
+  $index = 0;
+  while(  $index < count( $userlist ) ){ // 一つ一つ取り出し
 
     // ユーザ情報を user_id, last_artwork_id, display_nameに分解
-    @$user_id         = $userlist[$i]['user_id'];
-    @$last_artwork_id = $userlist[$i]['last_artwork_id'];
-    @$display_name    = $userlist[$i]['display_name'];
+    @$user_id         = $userlist[$index]['user_id'];
+    @$last_artwork_id = $userlist[$index]['last_artwork_id'];
+    @$display_name    = $userlist[$index]['display_name'];
 
     if ( $display_name == '' ){ //ディスプレイネームが設定されていない
       list( $user_exist, $display_name ) = UserCheck( $user_id ); // ユーザがいるか?
     } else { // されている
       list( $user_exist, $display_name ) = UserCheck( $user_id );
-      $display_name = $userlist[$i]['display_name'];
+      $display_name = $userlist[$index]['display_name'];
     }
 
     if ( $user_exist == 0 ){ // user exsit
@@ -40,13 +41,16 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
         $last_artwork_id = ''; // 空に設定
       }
 
-      $userlist[$i]['last_artwork_id'] = $last_artwork_id;
-      $userlist[$i]['display_name']    = $display_name;
+      $userlist[$index]['last_artwork_id'] = $last_artwork_id;
+      $userlist[$index]['display_name']    = $display_name;
+
+      $index = $index + 1;
 
     } else { // userが存在してない場合
-
-
+      Msg( 0, "Delete the user_id '" . $user_id . "'.\n" );
+      array_splice( $userlist, $index, 1 );
     }
+
     WriteCsv ( $userlist, $userlist_file ); //書き込み
   }
 }
@@ -395,7 +399,6 @@ function Curl( $url, $log_file_name, $referer ){
   curl_close( $ch ); // curl終了
 
   return array( $content, $info );
-
 }
 
 function MakeDirectory( $dir ){
@@ -409,4 +412,5 @@ function MakeDirectory( $dir ){
   return 0; //作れました. or ありました.
 
 }
+
 ?>
