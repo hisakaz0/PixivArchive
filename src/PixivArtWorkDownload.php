@@ -5,44 +5,37 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
   for ( $i = 0; $i < count( $userlist ); $i++ ){ // 一つ一つ取り出し
 
     // ユーザ情報を user_id, last_artwork_id, display_nameに分解
-    $user_id         = $userlist[$i]['user_id'];
+    @$user_id         = $userlist[$i]['user_id'];
     @$last_artwork_id = $userlist[$i]['last_artwork_id'];
     @$display_name    = $userlist[$i]['display_name'];
 
     if ( $display_name == '' ){ //ディスプレイネームが設定されていない
-      list( $user_exist, $display_name ) = UserCheck( $user_id );
+      list( $user_exist, $display_name ) = UserCheck( $user_id ); // ユーザがいるか?
     } else { // されている
       list( $user_exist, $display_name ) = UserCheck( $user_id );
       $display_name = $userlist[$i]['display_name'];
     }
 
     if ( $user_exist == 0 ){ // user exsit
-
       if ( $last_artwork_id == '' ){ // last_artwork_idがnull 初めてのご利用
-        $dir = '.images/' . $user_id; // ユーザのディレクトリ
-        if ( ! file_exists( $dir ) ){ // フォルダが作られているか
-          if ( mkdir( $dir, 0777, true ) ) {   // なかったら作る
-            $current_artwork_id = 1; // 空に設定 条件フラグの役割
-            Msg('error', "failed make directory in $dir.\n"); // 作れなかった報告
-            break 3; # dl市内
-          }
+
+        if ( ! MakeDirectory( '.images/' . $user_id ) ) { // ユーザのディレクトリ作成
+          $current_artwork_id = 1; // 空に設定 条件フラグの役割
+          Msg('error', "failed make directory in $dir.\n"); // 作れなかった報告
+          break 2; # dlしない
         }
-
-        $page = 1; // 最新のページ
-        $current_artwork_id = GetFirstArtWorkId( $user_id, $page ); //処女get
-
+        $current_artwork_id = GetFirstArtWorkId( $user_id, 1 ); //処女get
         if ( $current_artwork_id != 1 ){ // 失敗したらオシマイ
           DownloadArtWork( $current_artwork_id, $user_id ); // 先頭の作品をdl
         }
-
       } else {
-        $current_artwork_id = $last_artwork_id; // 注目している作品
+        $current_artwork_id = $last_artwork_id; // またのご来店
       }
 
-      if ( $current_artwork_id != 1 ){ // 失敗してなかったら
+      if ( $current_artwork_id != 1 ){ // 成功してたら
         $last_artwork_id = AllDownloadArtWork(
           $current_artwork_id, $user_id ); // 最新の作品までdonwnload
-      } else {
+      } else { // 失敗してたら
         Msg('interrupt', "download artwork with user_id $user_id.\n"); //dlしないと報告
         $last_artwork_id = ''; // 空に設定
       }
@@ -50,8 +43,11 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
       $userlist[$i]['last_artwork_id'] = $last_artwork_id;
       $userlist[$i]['display_name']    = $display_name;
 
-      WriteCsv ( $userlist, $userlist_file ); //書き込み
+    } else { // userが存在してない場合
+
+
     }
+    WriteCsv ( $userlist, $userlist_file ); //書き込み
   }
 }
 
@@ -229,10 +225,12 @@ function DownloadArtWork( $artwork_id, $user_id ){
     $order = ''; // うごいらに順番なんてない
     $dir_path  = '.images/' . $user_id. '/' . $artwork_stored_name;
     $file_path =  $dir_path . '/ugoira.zip';
-    if ( ! file_exists( $dir_path ) ) {
-      mkdir( $dir_path, 0777, true ) //フォルダ作成
-        or die("Interrupt: Can't mkdir ". $dir_path ."'\n");
+
+    if ( MakeDirectory( $dir_path ) ){
+      Msg( "error", "Couldn't make the directory " . $dir_path . "'\n" );
+      return 1;
     }
+
     DownloadContent(
       $artwork_id, $url, $referer, $order, $file_path );
     $zip = new ZipArchive;
@@ -240,17 +238,16 @@ function DownloadArtWork( $artwork_id, $user_id ){
       $zip->extractTo( $dir_path ); // 解凍先
       $zip->close();
       Msg( "succeed", "Extract a zip file '$file_path'\n\tto '$dir_path'.\n" );
-      unlink( $file_path );
+      unlink( $file_path ); // ファイル削除
       Msg( "succeed", "Remove a zip file '$file_path'.\n" );
     } else {
       Msg( "error", "Couldn't remove a zip file '$file_path'.\n" );
     }
+
     return 0;
   }
 
-  HtmlDump( $html, $log_file_name );
-  CurlDump( $info, $log_file_name );
-  Msg( "error", "cannot download the artwork with artwork_id '" . $artwork_id . "'\n" );
+  Msg( "error", "Couldn't  download the artwork with artwork_id '" . $artwork_id . "'\n" );
   return 1;
 }
 
@@ -272,7 +269,7 @@ function DownloadContent(
     fputs( $handle, $html );
     fclose( $handle );
 
-    Msg( "succeed", "Downloaded a image in $file_path\n" );
+    Msg( "succeed", "Downloaded a content in $file_path\n" );
     return 0;
 
   } else {
@@ -290,10 +287,10 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
 
   list( $html, $info ) = @Curl( $url, $log_file_name, $referer );
 
-
   $dir = '.images/'. $user_id. '/' . $artwork_stored_name;
-  if ( ! file_exists( $dir ) ){ // ファイルが存在するか
-    mkdir( $dir, 0777, true ) or die("Interrupt: Can't mkdir ". $dir ."'\n");
+  if ( MakeDirectory( $dir ) ){
+    Msg( "error", "Couldn't make the directory " . $dir_path . "'\n" );
+    return 1;
   }
 
   $q = '//section/div[ @class = "item-container" ]/img';// original-img url
@@ -301,22 +298,27 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
   $order = 0; // マンガのページ番号
   $referer = $url; // refererの設定
 
-  foreach ( $res as $node ){
+  if ( $res->length != 0  ){
+    foreach ( $res as $node ){
+      $matchs = array();
+      $url = $node->getAttribute('data-src'); //  srcは実際に表示されているとき
+      preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
+      $suffix = $matchs[1];
 
-    $url = $node->getAttribute('data-src'); //  srcは実際に表示されているとき
-    preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
-    $suffix = $matchs[1];
+      $file_path = sprintf( // ファイルパス
+        '.images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
+        $user_id, $artwork_stored_name, $order, $suffix
+      );
 
-    $file_path = sprintf( // ファイルパス
-      '.images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
-      $user_id, $artwork_stored_name, $order, $suffix);
-
-    DownloadContent( // 各画像をダウンロード
-      $artwork_id, $url, $referer, $order, $file_path );
-    $order = $order + 1; // ページ番号をインクリメント
+      DownloadContent( // 各画像をダウンロード
+        $artwork_id, $url, $referer, $order, $file_path );
+      $order = $order + 1; // ページ番号をインクリメント
+    }
+    return 0;
+  } else {
+    Msg( "error", "Couldn't donwnload the manga with artwork_id " . $artwork_id. "'\n" );
+    return 1;
   }
-
-  return 0;
 }
 
 function NextArtWorkExist( $artwork_id ){
@@ -393,6 +395,18 @@ function Curl( $url, $log_file_name, $referer ){
   curl_close( $ch ); // curl終了
 
   return array( $content, $info );
+
+}
+
+function MakeDirectory( $dir ){
+
+  if ( ! is_dir( $dir ) ){ // ディレクトリがあるか?
+    if ( ! mkdir( $dir, 0777, true ) ) { // なければ作る
+      return 1; // 作れませんでした.
+    }
+  }
+
+  return 0; //作れました. or ありました.
 
 }
 ?>
