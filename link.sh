@@ -5,7 +5,7 @@ LINK_DIR=$2
 USERLIST_FILE=$3
 
 if [ -z $USERLIST_FILE]; then # 引数足りない
-  echo "usage: $0 link <IMAGE_DIR> <LINK_DIR> <USERLIST_FILE>"
+  echo "usage: $0 <IMAGE_DIR> <LINK_DIR> <USERLIST_FILE>"
   exit 1;
 fi
 
