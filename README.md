@@ -7,18 +7,16 @@ pixivの画像をだだっとdlしてくるやつです.
 1. `userlist.csv`を自分好みに設定する.
 2. `login.php`でpixivにログインする.
 3. `dl.php`でdlが始まります.
-4. `link.sh`で綺麗に飾ります.
+4. `link.sh`で綺麗にします.
 
 __login.php__
 ```bash
 ./login.php <username|email> <password> [cookie_file]
 ```
-
 __dl.php__
 ```bash
 ./dl.php <cookie_file> <userlist.csv>
 ```
-
 __link.sh__
 ```bash
 ./link.sh <image_dir> <link_dir> <userlist>
