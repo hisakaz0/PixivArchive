@@ -1,3 +1,7 @@
+memo.md
+test.php
+cookie.txt
+userlist.csv
 *.html
 *.log
 tmp
@@ -5,7 +9,3 @@ tmp
 *.org
 images
 .images
-memo.md
-test.php
-cookie.txt
-userlist.csv

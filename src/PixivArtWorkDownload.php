@@ -1,5 +1,8 @@
 <?php
 
+require_once dirname(__file__) . '/../lib/ansi-color.php';
+use PhpAnsiColor\Color;
+
 function PixivArtWorkDownload ( $userlist, $userlist_file ){
 
   $index = 0;
@@ -414,5 +417,26 @@ function MakeDirectory( $dir ){
   return true; //作れました. or ありました.
 
 }
+
+function Msg( $type, $msg ){
+
+  global $log_file;
+
+  $ann = array(
+    'started'   => Color::set("Started", "yellow+bold"),
+    'succeed'   => Color::set("Succeed", "green+bold"),
+    'error'     => Color::set("Error", "red+bold+underline"),
+    'interrupt' => Color::set("Interrupt", "blue+bold")
+  );
+
+  @$out = $ann["$type"] . ": " . $msg;
+  fputs( STDERR, $out );
+
+  @$out = $type . ": " . $msg;
+  $handle = fopen( $log_file, 'a' );
+  fputs( $handle, $out);
+  fclose( $handle );
+}
+
 
 ?>
