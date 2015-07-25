@@ -10,31 +10,50 @@ $session_id = date( 'ymdHis' );
 mkdir( 'log/dl/' . $session_id, 0777, true );
 $log_file = 'log/dl/' . $session_id . '/dl.log';
 
-function GetFollowings( ){
+function GetFollowings( $pages ){
 
   global $cookie_file;
-  $url = 'http://www.pixiv.net/bookmark.php?type=user';
+
+  $pages      = 1;
   $followings = array();
 
-  list( $html, $info  ) = @Curl( $url , '' );
+  while ( true ){
 
-  $q = '//section/div[ @class = "members" ]/ul/li/div[ @class = "usericon" ]/a';
-  $res = HtmlParse( $html, $q );
+    $url = 'http://www.pixiv.net/bookmark.php?type=user&rest=show&p=' . $pages;
+    list( $html, $info  ) = @Curl( $url , '' );
 
-  if ( $res->length != 0 ){
-    foreach ( $res as $node ){
-      $href = $node->getAttribute('href'); //  srcは実際に表示されているとき
-      $matchs = array();
-      preg_match( '/\w+\.\w+\?\w+=(\d+)/', $href, $matchs );
-      array_push( $followings, $matchs[1] );
+
+    # 今見ているページのfollowingsを取得
+    $q = '//section/div[ @class = "members" ]/ul/li/div[ @class = "usericon" ]/a';
+    $res = HtmlParse( $html, $q );
+
+    if ( $res->length != 0 ){
+      foreach ( $res as $node ){
+        $href = $node->getAttribute('href'); //  srcは実際に表示されているとき
+        $matchs = array();
+        preg_match( '/\w+\.\w+\?\w+=(\d+)/', $href, $matchs );
+        array_push( $followings, $matchs[1] );
+      }
+    } else {
+      return false;
     }
-  } else {
-    return false;
+
+
+    # 次のページありゅ?
+    $q = '//section/div[ @class = "pages" ]/ol/li/a[ @rel = "next"]'; // next page
+    $res = HtmlParse( $html, $q );
+
+    if ( $res->length == 2 ){
+      Msg( 0, "Go on next page '2'.\n" );
+      $pages = $pages + 1;
+    } else {
+      return $followings;
+    }
+
   }
-  return $followings;
 }
 
-$followings = GetFollowings();
+$followings = @GetFollowings();
 if ( $followings == false  ){
   Msg( 'error', "Coundn't get your followings!\n" );
   exit( 1 );
