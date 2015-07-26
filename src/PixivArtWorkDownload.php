@@ -63,7 +63,7 @@ function UserCheck( $user_id ){
   $url = 'http://www.pixiv.net/member.php?id=' . $user_id;
   $log_file_name = 'user_check_' . $user_id ;
 
-  list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = Curl( $url ); // urlからcontentを引っ張ってくる
 
   if ( $info['http_code'] != '404' ){ // ユーザが存在するかどうか
 
@@ -110,7 +110,7 @@ function GetFirstArtWorkId( $user_id, $page ){
       . 'id=' . $user_id . '&type=all' . '&p=' . $page;
     $log_file_name = 'first_artwork_id_' . $user_id;
 
-    list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+    list( $html, $info ) = Curl( $url ); // urlからcontentを引っ張ってくる
 
 
     $q = '//ul[ @class = "page-list" ]/li[last()]/a'; // 辿れる最後のページを取得
@@ -145,7 +145,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
   $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
   $log_file_name = 'download_artwork_' . $artwork_id;
 
-  list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = Curl( $url ); // urlからcontentを引っ張ってくる
 
   Msg( "started", "Download a artwork with artwork_id '" . $artwork_id . "'.\n" );
 
@@ -217,28 +217,28 @@ function DownloadArtWork( $artwork_id, $user_id ){
   $q = '//div[ @class = "works_display" ]/a';
   $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
-    $referer = $url; // refererの設定
-    foreach ( $res as $node ){
+    $referer = 'http://www.pixiv.net/' . $url;
+    foreach ( $res as $node ){ // img urlの取り出し
       $url = $node->getAttribute('href'); // artwork url(big or manga)
       $matchs = array(); // get mode and artwork_id
       preg_match( '/\w+\.\w+\?\w+=(\w+)&\w+=(\d+)/', $url, $matchs );
       $mode       = $matchs[1];
       $artwork_id = $matchs[2];
     }
+
     if ( $mode == 'big' ) { // イラストか判定 イラストだったらdlしてreturn 0
 
       Msg( 0, "Mode is illust.\n" );
-      $referer = 'http://www.pixiv.net/' . $url;
 
-      $q = '//div[ @class = "works_display" ]/a/div/img';
+      list( $html, $info ) = Curl( $url, $referer );
+      $referer = $url; // refererにmode bigのurlを
+
+      $q = '//img'; // original image url
       $res = HtmlParse( $html, $q );
       if ( $res->length == 1 ){
         foreach( $res as $node ){
-          $url = $node->getAttribute('src'); // 600x600 image url
-          $url = preg_replace( '/_master1200/', '', $url ); // オリジナルへの対応
-          $url = preg_replace( '/c\/600x600\/img-master/', 'img-original', $url );
+          $url = $node->getAttribute('src'); // original image url
         }
-
         preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
         $suffix = $matchs[1];
         $file_path = '.images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
@@ -301,8 +301,7 @@ function DownloadContent( $artwork_id, $url, $referer, $order, $file_path ){
     $log_file_name = 'download_image_' . $artwork_id . '_' . $order;
   }
 
-  list( $html, $info ) =
-    @Curl( $url, $log_file_name, $referer ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = Curl( $url, $referer ); // urlからcontentを引っ張ってくる
 
   if ( $info['http_code'] == 200 ){
 
@@ -325,7 +324,7 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
   $url     = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id; // manga url
   $log_file_name = 'donwnload_manga_' . $artwork_id;
 
-  list( $html, $info ) = @Curl( $url, $log_file_name, $referer );
+  list( $html, $info ) = Curl( $url, $referer );
 
   $dir = '.images/'. $user_id. '/' . $artwork_stored_name;
   if ( ! MakeDirectory( $dir ) ){
@@ -333,33 +332,34 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
     return 1;
   }
 
-  $q = '//section/div[ @class = "item-container" ]/img'; // mangaの縮小画像のurl
+  $q = '//section/div[ @class = "item-container" ]/a'; // original image url list
   $res = HtmlParse( $html, $q );
   $order = 0; // マンガのページ番号
-  $referer = $url; // refererの設定
+  $referer_manga = $url; // refererはmanga一覧ページ
 
   if ( $res->length != 0  ){
     foreach ( $res as $node ){
 
-      $url = $node->getAttribute('data-src'); //  srcは実際に表示されているとき
-      $matchs = array();
-      $url = preg_replace( '/_master1200/', '', $url ); // オリジナルへの対応
-      $url = preg_replace( '/c\/1200x1200\/img-master/', 'img-original', $url );
+      $url = 'http://www.pixiv.net/member_illust.php?'
+        . $node->getAttribute('href'); // original image url
+      list( $html, $info ) = Curl( $url, $referer_manga );
 
-      $referer = 'http://www.pixiv.net/member_illust.php?' .
-        'mode=manga_big&illust_id=' . $artwork_id . '&page=' . $order; // オリジナルへの対応
+      $q = '//img'; // original image url
+      $res = HtmlParse( $html, $q );
+      if ( $res->length == 1 ){
+        foreach( $res as $node ){
+          $url = $node->getAttribute('src'); // original image url
+        }
+        preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
+        $suffix = $matchs[1];
+        $file_path = sprintf( // ファイルパス
+          '.images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
+          $user_id, $artwork_stored_name, $order, $suffix
+        );
 
-      preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
-      $suffix = $matchs[1];
-      $file_path = sprintf( // ファイルパス
-        '.images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
-        $user_id, $artwork_stored_name, $order, $suffix
-      );
-
-      print "url    : $url\nreferer: $referer\n";
-      DownloadContent( // 各画像をダウンロード
-        $artwork_id, $url, $referer, $order, $file_path );
-
+        print "url    : $url\nreferer: $referer\n";
+        DownloadContent( $artwork_id, $url, $referer, $order, $file_path );
+      }
       $order = $order + 1; // ページ番号をインクリメント
     }
     return 0;
@@ -375,7 +375,7 @@ function NextArtWorkExist( $artwork_id ){
   $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
   $log_file_name = 'next_artwork_id_' . $artwork_id;
 
-  list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = Curl( $url ); // urlからcontentを引っ張ってくる
 
   $q = '//ul/li[ @class = "before" ]/a'; // 次の作品
   $res = HtmlParse( $html, $q );
@@ -423,10 +423,9 @@ function HtmlParse( $html, $q ){
   return $res;
 }
 
-function Curl( $url, $log_file_name, $referer ){
+function Curl( $url, $referer ){
 
-  global $session_id, $cookie_file;
-  $log_file = 'log/dl/' . $session_id . '/' . $log_file_name . '.log' ;
+  global $cookie_file;
 
   $ch = curl_init( $url ); // curlの初期設定
   curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, true ); // redirectionを有効化
