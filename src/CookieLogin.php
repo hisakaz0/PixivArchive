@@ -15,7 +15,7 @@ function CookieLogin (){ // cookie_fileでログインできるか?
     Msg( 0, "Your login is successful!\n" );
     return 0;
   }else{ // 失敗
-    Msg( 0, "Your login...\n", 'error' );
+    Msg( 'error', "Failed your login...\n", 'error' );
     Msg( 0, "Please pass a login with 'login.php' before execution $argv[0].\n" );
     return 1;
   }

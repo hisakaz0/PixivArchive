@@ -21,25 +21,33 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
     }
 
     if ( $user_exist == 0 ){ // user exsit
-      if ( $last_artwork_id == '' ){ // last_artwork_idがnull 初めてのご利用
-        $dir = '.images/' . $user_id;
-        if ( ! MakeDirectory( $dir ) ) { // ユーザのディレクトリ作成
-          $current_artwork_id = 1; // 空に設定 条件フラグの役割
-          Msg('error', "failed make directory in $dir.\n"); // 作れなかった報告
-        } else {
-          $current_artwork_id = GetFirstArtWorkId( $user_id, 1 ); //処女get
-          if ( $current_artwork_id != 1 ){ // 失敗したらオシマイ
-            DownloadArtWork( $current_artwork_id, $user_id ); // 先頭の作品をdl
-          }
-        }
-      } else {
-        $current_artwork_id = $last_artwork_id; // またのご来店
+
+      // 生存報告
+      Msg( "succeed", "user_id '$user_id' / display_name '$display_name' is exist!.\n" );
+      Msg( "started", "Download artworks of user_id '$user_id'.\n" );
+
+      // ユーザのディレクトリ作成
+      $dir = '.images/' . $user_id;
+      if ( ! MakeDirectory( $dir ) ) {
+        Msg('error', "failed make directory in $dir.\n"); // 作れなかった報告
+        $current_artwork_id = 1; // 1(false)に設定 条件フラグの役割
       }
 
-      if ( $current_artwork_id != 1 ){ // 成功してたら
+      // ユーザのディレクトが作成できていたら
+      if ( $current_artwork_id != 1 ){
+
+        if ( $last_artwork_id == '' ){ // last_artwork_idがnull 初めてのご利用
+          $current_artwork_id = 1; // 空に設定 条件フラグの役割
+        } else {
+          $current_artwork_id = GetFirstArtWorkId( $user_id, 1 ); //処女get
+          DownloadArtWork( $current_artwork_id, $user_id ); // 先頭の作品をdl
+          $current_artwork_id = $last_artwork_id; // またのご来店
+        }
         $last_artwork_id = AllDownloadArtWork(
           $current_artwork_id, $user_id ); // 最新の作品までdonwnload
-      } else { // 失敗してたら
+
+        // ユーザのディレクトが作成できなかったら
+      } else {
         Msg('interrupt', "download artwork with user_id $user_id.\n"); //dlしないと報告
         $last_artwork_id = ''; // 空に設定
       }
@@ -50,6 +58,7 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
       $index = $index + 1;
 
     } else { // userが存在してない場合
+      Msg( "error", "user_id '$user_id' is not exsit!\n" ); // そんなユーザいねぇ
       Msg( 0, "Delete the user_id '" . $user_id . "'.\n" );
       array_splice( $userlist, $index, 1 );
     }
@@ -63,7 +72,7 @@ function UserCheck( $user_id ){
   $url = 'http://www.pixiv.net/member.php?id=' . $user_id;
   $log_file_name = 'user_check_' . $user_id ;
 
-  list( $html, $info ) = Curl( $url ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url ); // urlからcontentを引っ張ってくる
 
   if ( $info['http_code'] != '404' ){ // ユーザが存在するかどうか
 
@@ -76,13 +85,11 @@ function UserCheck( $user_id ){
       }
     }
 
-    Msg( "succeed", "user_id '$user_id' / display_name '$display_name' is exist!.\n" );
-    Msg( "started", "Download artworks of user_id '$user_id'.\n" ); //いた
+    // ユーザの生存確認
     return array( 0, $display_name );
 
   } else { // ユーザが存在しない
 
-    Msg( "error", "user_id '$user_id' is not exsit!\n" ); // そんなユーザいねぇ
     return array( 1, '' );
 
   }
@@ -110,7 +117,7 @@ function GetFirstArtWorkId( $user_id, $page ){
       . 'id=' . $user_id . '&type=all' . '&p=' . $page;
     $log_file_name = 'first_artwork_id_' . $user_id;
 
-    list( $html, $info ) = Curl( $url ); // urlからcontentを引っ張ってくる
+    list( $html, $info ) = @Curl( $url ); // urlからcontentを引っ張ってくる
 
 
     $q = '//ul[ @class = "page-list" ]/li[last()]/a'; // 辿れる最後のページを取得
@@ -145,7 +152,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
   $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
   $log_file_name = 'download_artwork_' . $artwork_id;
 
-  list( $html, $info ) = Curl( $url ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url ); // urlからcontentを引っ張ってくる
 
   Msg( "started", "Download a artwork with artwork_id '" . $artwork_id . "'.\n" );
 
@@ -207,7 +214,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
     $suffix = $matchs[1];
     $file_path = '.images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
     $order = '';
-    print "url    : $url\nreferer: $referer\n";
+    // print "url    : $url\nreferer: $referer\n";
     DownloadContent( $artwork_id, $url, $referer, $order, $file_path );
     return 0;
   }
@@ -217,9 +224,10 @@ function DownloadArtWork( $artwork_id, $user_id ){
   $q = '//div[ @class = "works_display" ]/a';
   $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
-    $referer = 'http://www.pixiv.net/' . $url;
+    $referer =  $url;
     foreach ( $res as $node ){ // img urlの取り出し
-      $url = $node->getAttribute('href'); // artwork url(big or manga)
+      $url = 'http://www.pixiv.net/'
+        . $node->getAttribute('href'); // artwork url(big or manga)
       $matchs = array(); // get mode and artwork_id
       preg_match( '/\w+\.\w+\?\w+=(\w+)&\w+=(\d+)/', $url, $matchs );
       $mode       = $matchs[1];
@@ -230,7 +238,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
 
       Msg( 0, "Mode is illust.\n" );
 
-      list( $html, $info ) = Curl( $url, $referer );
+      list( $html, $info ) = @Curl( $url, $referer );
       $referer = $url; // refererにmode bigのurlを
 
       $q = '//img'; // original image url
@@ -243,7 +251,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
         $suffix = $matchs[1];
         $file_path = '.images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
 
-        print "url    : $url\nreferer: $referer\n";
+        // print "url    : $url\nreferer: $referer\n";
         DownloadContent( $artwork_id, $url, $referer, $order, $file_path );
       }
 
@@ -301,7 +309,7 @@ function DownloadContent( $artwork_id, $url, $referer, $order, $file_path ){
     $log_file_name = 'download_image_' . $artwork_id . '_' . $order;
   }
 
-  list( $html, $info ) = Curl( $url, $referer ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url, $referer ); // urlからcontentを引っ張ってくる
 
   if ( $info['http_code'] == 200 ){
 
@@ -324,7 +332,7 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
   $url     = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id; // manga url
   $log_file_name = 'donwnload_manga_' . $artwork_id;
 
-  list( $html, $info ) = Curl( $url, $referer );
+  list( $html, $info ) = @Curl( $url, $referer );
 
   $dir = '.images/'. $user_id. '/' . $artwork_stored_name;
   if ( ! MakeDirectory( $dir ) ){
@@ -340,9 +348,12 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
   if ( $res->length != 0  ){
     foreach ( $res as $node ){
 
-      $url = 'http://www.pixiv.net/member_illust.php?'
+      $url = 'http://www.pixiv.net/'
         . $node->getAttribute('href'); // original image url
-      list( $html, $info ) = Curl( $url, $referer_manga );
+
+      // print "url    : $url\nreferer: $referer_manga\n";
+      list( $html, $info ) = @Curl( $url, $referer_manga );
+      $referer = $url;
 
       $q = '//img'; // original image url
       $res = HtmlParse( $html, $q );
@@ -357,7 +368,7 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
           $user_id, $artwork_stored_name, $order, $suffix
         );
 
-        print "url    : $url\nreferer: $referer\n";
+        // print "url    : $url\nreferer: $referer\n";
         DownloadContent( $artwork_id, $url, $referer, $order, $file_path );
       }
       $order = $order + 1; // ページ番号をインクリメント
@@ -375,7 +386,7 @@ function NextArtWorkExist( $artwork_id ){
   $url = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
   $log_file_name = 'next_artwork_id_' . $artwork_id;
 
-  list( $html, $info ) = Curl( $url ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url ); // urlからcontentを引っ張ってくる
 
   $q = '//ul/li[ @class = "before" ]/a'; // 次の作品
   $res = HtmlParse( $html, $q );
@@ -451,6 +462,7 @@ function MakeDirectory( $dir ){
     if ( ! mkdir( $dir, 0777, true ) ) { // なければ作る
       return false; // 作れませんでした.
     }
+    Msg( 0, "Make a directory in '$dir'\n" );
   }
 
   return true; //作れました. or ありました.
