@@ -26,7 +26,7 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
         if ( ! MakeDirectory( $dir ) ) { // ユーザのディレクトリ作成
           $current_artwork_id = 1; // 空に設定 条件フラグの役割
           Msg('error', "failed make directory in $dir.\n"); // 作れなかった報告
-        } else { 
+        } else {
           $current_artwork_id = GetFirstArtWorkId( $user_id, 1 ); //処女get
           if ( $current_artwork_id != 1 ){ // 失敗したらオシマイ
             DownloadArtWork( $current_artwork_id, $user_id ); // 先頭の作品をdl
@@ -207,17 +207,50 @@ function DownloadArtWork( $artwork_id, $user_id ){
     $suffix = $matchs[1];
     $file_path = '.images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
     $order = '';
+    print "url    : $url\nreferer: $referer\n";
     DownloadContent( $artwork_id, $url, $referer, $order, $file_path );
     return 0;
   }
 
 
-  // マンガ検索 マンガだったらかDownloadMangaを行って return 0
+  // illust か manga
   $q = '//div[ @class = "works_display" ]/a';
   $res = HtmlParse( $html, $q );
   if ( $res->length == 1 ){
-    Msg( 0, "Mode is mange.\n" );
-    DownloadManga( $artwork_id, $user_id, $artwork_stored_name );
+    $referer = $url; // refererの設定
+    foreach ( $res as $node ){
+      $url = $node->getAttribute('href'); // artwork url(big or manga)
+      $matchs = array(); // get mode and artwork_id
+      preg_match( '/\w+\.\w+\?\w+=(\w+)&\w+=(\d+)/', $url, $matchs );
+      $mode       = $matchs[1];
+      $artwork_id = $matchs[2];
+    }
+    if ( $mode == 'big' ) { // イラストか判定 イラストだったらdlしてreturn 0
+
+      Msg( 0, "Mode is illust.\n" );
+      $referer = 'http://www.pixiv.net/' . $url;
+
+      $q = '//div[ @class = "works_display" ]/a/div/img';
+      $res = HtmlParse( $html, $q );
+      if ( $res->length == 1 ){
+        foreach( $res as $node ){
+          $url = $node->getAttribute('src'); // 600x600 image url
+          $url = preg_replace( '/_master1200/', '', $url ); // オリジナルへの対応
+          $url = preg_replace( '/c\/600x600\/img-master/', 'img-original', $url );
+        }
+
+        preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
+        $suffix = $matchs[1];
+        $file_path = '.images/' . $user_id . '/' . $artwork_stored_name . '.' . $suffix;
+
+        print "url    : $url\nreferer: $referer\n";
+        DownloadContent( $artwork_id, $url, $referer, $order, $file_path );
+      }
+
+    } else { // マンガ検索 マンガだったらかDownloadMangaを行って return 0
+      Msg( 0, "Mode is mange.\n" );
+      DownloadManga( $artwork_id, $user_id, $artwork_stored_name );
+    }
     return 0;
   }
 
@@ -289,8 +322,7 @@ function DownloadContent( $artwork_id, $url, $referer, $order, $file_path ){
 
 function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
 
-  $url     = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id;
-  $referer = 'http://www.pixiv.net/member_illust.php?mode=medium&illust_id=' . $artwork_id;
+  $url     = 'http://www.pixiv.net/member_illust.php?mode=manga&illust_id=' . $artwork_id; // manga url
   $log_file_name = 'donwnload_manga_' . $artwork_id;
 
   list( $html, $info ) = @Curl( $url, $log_file_name, $referer );
@@ -301,25 +333,33 @@ function DownloadManga( $artwork_id, $user_id, $artwork_stored_name ){
     return 1;
   }
 
-  $q = '//section/div[ @class = "item-container" ]/img';// original-img url
+  $q = '//section/div[ @class = "item-container" ]/img'; // mangaの縮小画像のurl
   $res = HtmlParse( $html, $q );
   $order = 0; // マンガのページ番号
   $referer = $url; // refererの設定
 
   if ( $res->length != 0  ){
     foreach ( $res as $node ){
-      $matchs = array();
+
       $url = $node->getAttribute('data-src'); //  srcは実際に表示されているとき
+      $matchs = array();
+      $url = preg_replace( '/_master1200/', '', $url ); // オリジナルへの対応
+      $url = preg_replace( '/c\/1200x1200\/img-master/', 'img-original', $url );
+
+      $referer = 'http://www.pixiv.net/member_illust.php?' .
+        'mode=manga_big&illust_id=' . $artwork_id . '&page=' . $order; // オリジナルへの対応
+
       preg_match( '/\.(\w+)$/', $url, $matchs ); // 拡張子取り出し
       $suffix = $matchs[1];
-
       $file_path = sprintf( // ファイルパス
         '.images/' . '%s' . '/' . '%s' . '/' . '%03d' . '.%s',
         $user_id, $artwork_stored_name, $order, $suffix
       );
 
+      print "url    : $url\nreferer: $referer\n";
       DownloadContent( // 各画像をダウンロード
         $artwork_id, $url, $referer, $order, $file_path );
+
       $order = $order + 1; // ページ番号をインクリメント
     }
     return 0;
