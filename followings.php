@@ -3,7 +3,12 @@
 
 require dirname(__file__) . '/src/PixivArtWorkDownload.php';
 
-$cookie_file = $argv[1];
+list( // パラメータの設定
+  $image_dir,
+  $link_dir,
+  $cookie_file,
+  $userlist_file
+) = SetParam();
 
 date_default_timezone_set( 'Asia/Tokyo' );
 $session_id = date( 'ymdHis' );
@@ -19,6 +24,7 @@ function GetFollowings( $pages ){
 
   while ( true ){
 
+    Msg( 0, "Page number is '$pages'.\n" );
     $url = 'http://www.pixiv.net/bookmark.php?type=user&rest=show&p=' . $pages;
     list( $html, $info  ) = @Curl( $url , '' );
 
@@ -44,7 +50,6 @@ function GetFollowings( $pages ){
     $res = HtmlParse( $html, $q );
 
     if ( $res->length == 2 ){
-      Msg( 0, "Go on next page '2'.\n" );
       $pages = $pages + 1;
     } else {
       return $followings;

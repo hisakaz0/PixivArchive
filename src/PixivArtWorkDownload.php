@@ -489,5 +489,27 @@ function Msg( $type, $msg ){
   fclose( $handle );
 }
 
+function SetParam(){
+
+  $setting_file = '.setting';
+  $setting_list = array();
+
+  $handle = fopen( $setting_file, 'r' );
+  while ( ! feof( $handle ) ){
+    $l = fgets( $handle );
+    $l = rtrim( $l );
+    array_push( $setting_list, $l );
+  }
+  fclose( $handle );
+
+  return array(
+    $setting_list[0], // image_dir
+    $setting_list[1], // link_dir
+    $setting_list[2], // cookie_file
+    $setting_list[3]  // userlist_file
+  );
+
+
+}
 
 ?>
