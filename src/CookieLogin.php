@@ -8,7 +8,7 @@ function CookieLogin (){ // cookie_fileでログインできるか?
   $url           = 'https://www.secure.pixiv.net/login.php';
   $log_file_name = 'cookie_login';
 
-  list( $html, $info ) = @Curl( $url, $log_file_name ); // urlからcontentを引っ張ってくる
+  list( $html, $info ) = @Curl( $url ); // urlからcontentを引っ張ってくる
   HtmlDump( $html, $log_file_name );
 
   if ( $info['url'] == 'http://www.pixiv.net/' ){ // 成功
@@ -17,7 +17,7 @@ function CookieLogin (){ // cookie_fileでログインできるか?
   }else{ // 失敗
     Msg( 'error', "Failed your login...\n", 'error' );
     Msg( 0, "Please pass a login with 'login.php' before execution $argv[0].\n" );
-    return 1;
+    exit( 1 ); // 失敗したらオシマイ
   }
 }
 ?>

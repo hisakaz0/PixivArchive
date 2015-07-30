@@ -25,10 +25,7 @@ $log_file = 'log/dl/' . $session_id . '/dl.log';
 
 
 # クッキーの処理
-if ( CookieLogin( ) ){
-  Msg( "interrupt", "the '$argv[0]' execution.\n" );
-  exit( 1 );
-}
+CookieLogin( );
 
 
 # csvファイルの読み込み
