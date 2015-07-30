@@ -1,5 +1,4 @@
 #!/usr/bin/php
-
 <?php
 
 require_once dirname(__file__) . '/src/CookieLogin.php';
@@ -14,23 +13,22 @@ list( // パラメータの設定
   $userlist_file
 ) = SetParam();
 
-exit;
-
 
 // ログフォルの作成
 date_default_timezone_set( 'Asia/Tokyo' );
-$session_id = date( 'ymdHis' );
-mkdir( 'log/dl/' . $session_id, 0777, true );
+$dir = 'log/dl/' . date( 'ymdHis' );
+if ( ! MakeDirectory( $dir ) ){
+  Msg( "error", "Couldn't make the directory " . $dir . "'\n" );
+  exit( 1 );
+}
 $log_file = 'log/dl/' . $session_id . '/dl.log';
 
 
 # クッキーの処理
 CookieLogin( );
 
-
 # csvファイルの読み込み
 $userlist = ReadCsv( $userlist_file );
-
 
 # 童貞が喜ぶぐへへな画像をdl
 # 世界の中心はここね❤

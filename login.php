@@ -1,8 +1,11 @@
 #!/usr/bin/php
-
 <?php
-function login($pixiv_id, $password, $cookie_file){
 
+require_once dirname(__file__) . '/src/PixivArtWorkDownload.php';
+
+function login($pixiv_id, $password ){
+
+  global $cookie_file;
   $url   = 'https://www.secure.pixiv.net/login.php';
   $param = array( // loginするのためのparameters
     'mode' => 'login',
@@ -49,25 +52,33 @@ function login($pixiv_id, $password, $cookie_file){
 
 // main
 
-if ( $argv[2] == '' ){
-  fputs( STDERR, "usage: $argv[0] <pixiv_id> <password> [cookie_file]\n" );
+list( // パラメータの設定
+  $image_dir,
+  $link_dir,
+  $cookie_file,
+  $userlist_file
+) = SetParam();
+
+
+$dir = 'log/login/';
+if ( ! MakeDirectory( $dir ) ){
+  Msg( "error", "Couldn't make the directory " . $dir . "'\n" );
+  exit( 1 );
+}
+date_default_timezone_set( 'Asia/Tokyo' );
+$log_file =  $dir . date( 'ymdHis' ) . '.log';
+
+
+if ( $argc != 3 ){
+  Msg( 0, "usage: $argv[0] <pixiv_id> <password>\n" );
   exit( 1 );
 }
 
-if ( $argv[3] == '' ){ // クッキーファイルに指定がない場合
-  $cookie_file = 'cookie.txt'; // デフォルト
-} else {
-  $cookie_file = $argv[3]; //指定されたクッキーファイル
-}
 
 $pixiv_id = $argv[1];
 $password = $argv[2];
 
-if ( ! file_exists( 'log/login' ) ){
-  mkdir( 'log/login', 0777, true ) or
-    die("Interrupt: Can't mkdir " . $dir ."'\n"); // 事故があったらえんだー
-}
-login( $pixiv_id, $password, $cookie_file );
+login( $pixiv_id, $password );
 
 ?>
 
