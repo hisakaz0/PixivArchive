@@ -441,8 +441,10 @@ function Curl( $url, $referer ){
   $ch = curl_init( $url ); // curlの初期設定
   curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, true ); // redirectionを有効化
   curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true ); // プレーンテキストで出力
+  curl_setopt( $sh, CURLOPT_CAINFO, "lib/cacert.pem" ); // windows用のopensslの公開鍵
   curl_setopt( $ch, CURLOPT_COOKIEJAR, $cookie_file ); // cookie情報を読み込む
   curl_setopt( $ch, CURLOPT_COOKIEFILE, $cookie_file ); // cookie情報を保存する
+  curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
 
   if ( $referer != '' ){ // refererがあれば
     curl_setopt( $ch, CURLOPT_REFERER, $referer ); // refererを設定
@@ -451,6 +453,7 @@ function Curl( $url, $referer ){
   $content = curl_exec( $ch ); // curlの実行
 
   $info = curl_getinfo( $ch ); // 実行結果
+  print curl_error( $ch ); // errorがあった場合に報告
   curl_close( $ch ); // curl終了
 
   return array( $content, $info );

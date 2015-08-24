@@ -1,4 +1,3 @@
-#!/usr/bin/php
 <?php
 
 require dirname(__file__) . '/src/PixivArtWorkDownload.php';

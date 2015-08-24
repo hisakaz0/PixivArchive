@@ -30,10 +30,12 @@ function login($pixiv_id, $password ){
   curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file); // cookie情報を保存する
   curl_setopt($ch, CURLOPT_POST, true); // postを行う
   curl_setopt($ch, CURLOPT_POSTFIELDS, $param); // postするデータを設定
+  curl_setopt($ch, CURLOPT_CAINFO, "lib/cacert.pem" ); // windows用のopensslの公開鍵
   curl_setopt($ch, CURLOPT_FILE, $handle);
   $html_file = curl_exec($ch);
   fclose($handle);
   $info = curl_getinfo($ch); // 実行結果
+  print curl_error($ch); // error報告
   curl_close($ch); // curl終了
 
   $res = print_r($info, true);
@@ -81,4 +83,3 @@ $password = $argv[2];
 login( $pixiv_id, $password );
 
 ?>
-
