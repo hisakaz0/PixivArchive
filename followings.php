@@ -29,7 +29,6 @@ WriteCsv(
   SortUserlist( UpdateFollowgins( $userlist, $followings ) ),
   $userlist_file );
 
-// WriteCsv( UpdateFollowgins( $userlist, $followings ), $userlist_file );
 exit( 0 );
 
 
@@ -40,7 +39,7 @@ function SortUserlist ( $userlist ){
   $sorted_list = array();
 
   foreach ( $id_list as $key => $id ){
-    $user = array(
+    @$user = array(
       'user_id'         => $userlist["$key"]['user_id'],
       'last_artwork_id' => $userlist["$key"]['last_artwork_id'],
       'display_name'    => $userlist["$key"]['display_name']
@@ -59,6 +58,8 @@ function UpdateFollowgins( $userlist, $followings ){
     $new['user_id'] = $id;
     array_push( $userlist, $new );
   }
+
+  print ": last_user_id: " . $userlist[count($userlist) - 1]['user_id'] . "\n";
 
   return $userlist;
 }

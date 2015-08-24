@@ -2,14 +2,18 @@
 
 function ReadCsv ( $file ){
 
-  $csv  = new splfileobject($file);
-  $csv->setFlags(SplFileObject::READ_CSV);
+  $handle = fopen( $file, 'r' );
+  while( ( $data = @fgetcsv( $handle, 0, "," )) !== false ){
+    $dumplist[] = $data;
+  }
+  fclose( $handle );
+
   $dumplist = array();
   $userlist = array();
 
-  foreach ( $csv as $row ){
-    array_push( $dumplist, $row );
-  }
+  // foreach ( $csv as $row ){ // 最後の空白を削除
+  //   array_push( $dumplist, $row );
+  // }
 
   array_shift( $dumplist ); // 列名の行は削除
 
@@ -47,10 +51,10 @@ function WriteCsv ( $userlist, $userlist_file ){
 
   $handle = fopen( $userlist_file, 'w' );
 
-  fputs( $handle, "user_id,last_artwork_id,display_name\n" ); // 列名を初めにかく
+  @fputs( $handle, "user_id,last_artwork_id,display_name\n" ); // 列名を初めにかく
   foreach( $userlist as $user ){
-    fputs( $handle,
-      $user['user_id'] . ',' .
+    @fputs( $handle,
+      @$user['user_id'] . ',' .
       @$user['last_artwork_id'] . ',' .
       @$user['display_name'] .  "\n"
     ); // 書き出し
