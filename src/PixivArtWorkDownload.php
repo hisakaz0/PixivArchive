@@ -26,15 +26,15 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
       Msg( "succeed", "user_id '$user_id' / display_name '$display_name' is exist!.\n" );
       Msg( "started", "Download artworks of user_id '$user_id'.\n" );
 
-      // ユーザのディレクトリ作成
-      $dir = '.images/' . $user_id;
+     
+      $dir = '.images/' . $user_id; // ユーザのディレクトリ作成
       if ( ! MakeDirectory( $dir ) ) {
         Msg('error', "failed make directory in $dir.\n"); // 作れなかった報告
         $current_artwork_id = 1; // 1(false)に設定 条件フラグの役割
-      } else { $current_artwork_id = 0; }
+      } else { $current_artwork_id = ''; } 
 
-      // ユーザのディレクトが作成できていたら
-      if ( $current_artwork_id == 0 ){
+     
+      if ( $current_artwork_id != 1 ){ // ユーザのディレクトが作成できていたら
 
         if ( $last_artwork_id == '' ){ // last_artwork_idがnull 初めてのご利用
           $current_artwork_id = GetFirstArtWorkId( $user_id, 1 ); //処女get
@@ -42,14 +42,15 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
         } else {
           $current_artwork_id = $last_artwork_id; // またのご来店
         }
+
         $last_artwork_id = AllDownloadArtWork(
           $current_artwork_id, $user_id ); // 最新の作品までdonwnload
 
         $userlist[$index]['last_artwork_id'] = $last_artwork_id;
         $userlist[$index]['display_name']    = $display_name;
 
-        // ユーザのディレクトが作成できなかったら
-      } else {
+       
+      } else { // ユーザのディレクトが作成できなかったら
         Msg('interrupt', "download artwork with user_id $user_id.\n"); //dlしないと報告
         $last_artwork_id = ''; // 空に設定
       }
