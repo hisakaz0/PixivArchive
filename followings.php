@@ -30,7 +30,6 @@ WriteCsv(
   SortUserlist( UpdateFollowgins( $userlist, $followings ) ),
   $userlist_file );
 
-// WriteCsv( UpdateFollowgins( $userlist, $followings ), $userlist_file );
 exit( 0 );
 
 
@@ -41,7 +40,7 @@ function SortUserlist ( $userlist ){
   $sorted_list = array();
 
   foreach ( $id_list as $key => $id ){
-    $user = array(
+    @$user = array(
       'user_id'         => $userlist["$key"]['user_id'],
       'last_artwork_id' => $userlist["$key"]['last_artwork_id'],
       'display_name'    => $userlist["$key"]['display_name']

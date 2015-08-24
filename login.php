@@ -43,10 +43,10 @@ function login($pixiv_id, $password ){
 
 
   if ( $info['url'] == 'http://www.pixiv.net/'){
-    fputs(STDERR, "Your login is successful!.\n");
-    fputs(STDERR, "Cookie file is " . dirname(__file__) . "/" . $cookie_file ."\n");
+    Msg( 0, "Your login is successful!.\n");
+    Msg( 0, "Cookie file is " . dirname(__file__) . "/" . $cookie_file ."\n");
   }else{
-    fputs(STDERR, "Failed your login...\n");
+    Msg( 0, "Failed your login...\n");
   }
 }
 
@@ -81,4 +81,3 @@ $password = $argv[2];
 login( $pixiv_id, $password );
 
 ?>
-

@@ -17,11 +17,11 @@ list( // パラメータの設定
 // ログフォルの作成
 date_default_timezone_set( 'Asia/Tokyo' );
 $dir = 'log/dl/' . date( 'ymdHis' );
+$log_file = $dir . '/dl.log';
 if ( ! MakeDirectory( $dir ) ){
   Msg( "error", "Couldn't make the directory " . $dir . "'\n" );
   exit( 1 );
 }
-$log_file = 'log/dl/' . $session_id . '/dl.log';
 
 
 # クッキーの処理

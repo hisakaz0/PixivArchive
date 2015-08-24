@@ -1,12 +1,14 @@
+userlist.csv
 memo.md
 test.php
 cookie.txt
-userlist.csv
 *.html
 *.log
-tmp
+*.csv
 *.swp
 *.org
+*.txt
+tmp
 images
 .images
 mklink.bat
