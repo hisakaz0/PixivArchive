@@ -11,3 +11,7 @@ cookie.txt
 tmp
 images
 .images
+mklink.bat
+mklink.vbs
+images_windows
+

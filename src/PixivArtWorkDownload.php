@@ -15,6 +15,7 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
 
     if ( $display_name == '' ){ //ディスプレイネームが設定されていない
       list( $user_exist, $display_name ) = UserCheck( $user_id ); // ユーザがいるか?
+      $display_name = ValidName( $display_name ):
     } else { // されている
       list( $user_exist, $display_name ) = UserCheck( $user_id );
       $display_name = $userlist[$index]['display_name'];
@@ -192,7 +193,7 @@ function DownloadArtWork( $artwork_id, $user_id ){
   if ( $title == '' ){ //タイトルないとの報告
     Msg( "error", "Couldn't get artwork title.\n" );
   } else { // ファイル名に使えない文字を置換
-    $title = preg_replace( '/(\\\|\/)/', '_', $title ); // スラ系はアンダーバーに変換
+    $title = ValidName( $title );
   }
 
 
@@ -508,6 +509,12 @@ function SetParam(){
     $setting_list[3]  // userlist_file
   );
 
+
+}
+
+function ValidName( $str ){ # ファイルシステムで扱える文字列に
+
+  return preg_replace( '/\\\|\/|\*|;|:|\||"|,|<|>|\?/', '_', $str ); 
 
 }
 
