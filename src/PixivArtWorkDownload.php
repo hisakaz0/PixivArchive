@@ -15,7 +15,7 @@ function PixivArtWorkDownload ( $userlist, $userlist_file ){
 
     if ( $display_name == '' ){ //ディスプレイネームが設定されていない
       list( $user_exist, $display_name ) = UserCheck( $user_id ); // ユーザがいるか?
-      $display_name = ValidName( $display_name ):
+      $display_name = ValidName( $display_name );
     } else { // されている
       list( $user_exist, $display_name ) = UserCheck( $user_id );
       $display_name = $userlist[$index]['display_name'];
